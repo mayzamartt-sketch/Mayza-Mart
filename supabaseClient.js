@@ -492,6 +492,218 @@
         reviews: reviews || undefined
       };
     }
+
+    // =========================================================
+    // CUSTOMER AUTH & DASHBOARD SERVICES
+    // =========================================================
+    getCurrentCustomer() {
+      try {
+        const stored = localStorage.getItem('mm_customer_session');
+        return stored ? JSON.parse(stored) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    setCurrentCustomer(customer) {
+      if (!customer) {
+        localStorage.removeItem('mm_customer_session');
+      } else {
+        localStorage.setItem('mm_customer_session', JSON.stringify(customer));
+      }
+      window.dispatchEvent(new CustomEvent('mayza:customer-auth-changed', {
+        detail: { customer }
+      }));
+    }
+
+    logoutCustomer() {
+      this.setCurrentCustomer(null);
+    }
+
+    async registerCustomer({ name, email, phone, address, password }) {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      const cleanName = (name || '').trim();
+      const cleanPhone = (phone || '').trim();
+      const cleanAddress = (address || '').trim();
+
+      if (!cleanEmail || !cleanName || !password) {
+        return { success: false, message: 'Name, email and password are required.' };
+      }
+
+      const newCustomer = {
+        id: 'CUST-' + Math.floor(100000 + Math.random() * 900000),
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone,
+        address: cleanAddress,
+        password: password,
+        created_at: new Date().toISOString()
+      };
+
+      // Try Supabase first if online
+      if (this.isConfigured()) {
+        try {
+          const { data: existing, error: checkErr } = await this.client
+            .from('customers')
+            .select('id')
+            .eq('email', cleanEmail)
+            .limit(1);
+
+          if (!checkErr && existing && existing.length > 0) {
+            return { success: false, message: 'An account with this email already exists. Please sign in!' };
+          }
+
+          const { data, error } = await this.client.from('customers').insert([newCustomer]).select();
+          if (error) {
+            console.warn('[Supabase] Customers table insert error, fallback local:', error.message);
+          }
+        } catch (err) {
+          console.warn('[Supabase] Customer register fallback:', err);
+        }
+      }
+
+      // Save locally as well for offline resilience
+      try {
+        const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
+        if (localCusts.some(c => (c.email || '').toLowerCase() === cleanEmail)) {
+          return { success: false, message: 'An account with this email already exists. Please sign in!' };
+        }
+        localCusts.push(newCustomer);
+        localStorage.setItem('mm_local_customers', JSON.stringify(localCusts));
+      } catch (e) {}
+
+      // Safe session object
+      const safeCustomer = {
+        id: newCustomer.id,
+        name: newCustomer.name,
+        email: newCustomer.email,
+        phone: newCustomer.phone,
+        address: newCustomer.address
+      };
+      this.setCurrentCustomer(safeCustomer);
+      return { success: true, customer: safeCustomer };
+    }
+
+    async loginCustomer({ email, password }) {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      if (!cleanEmail || !password) {
+        return { success: false, message: 'Please enter both email and password.' };
+      }
+
+      // Check cloud database
+      if (this.isConfigured()) {
+        try {
+          const { data, error } = await this.client
+            .from('customers')
+            .select('*')
+            .eq('email', cleanEmail)
+            .limit(1);
+
+          if (!error && data && data.length > 0) {
+            const user = data[0];
+            if (user.password === password) {
+              const safeCustomer = {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                address: user.address
+              };
+              this.setCurrentCustomer(safeCustomer);
+              return { success: true, customer: safeCustomer };
+            } else {
+              return { success: false, message: 'Incorrect password. Please try again.' };
+            }
+          }
+        } catch (err) {
+          console.warn('[Supabase] Login check cloud error:', err);
+        }
+      }
+
+      // Check local storage fallback
+      try {
+        const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
+        const found = localCusts.find(c => (c.email || '').toLowerCase() === cleanEmail);
+        if (found) {
+          if (found.password === password) {
+            const safeCustomer = {
+              id: found.id,
+              name: found.name,
+              email: found.email,
+              phone: found.phone,
+              address: found.address
+            };
+            this.setCurrentCustomer(safeCustomer);
+            return { success: true, customer: safeCustomer };
+          } else {
+            return { success: false, message: 'Incorrect password. Please try again.' };
+          }
+        }
+      } catch (e) {}
+
+      return { success: false, message: 'No account found with this email. Please create an account first!' };
+    }
+
+    async updateCustomerProfile(updatedData) {
+      const current = this.getCurrentCustomer();
+      if (!current) return { success: false, message: 'Not signed in' };
+
+      const updated = { ...current, ...updatedData };
+      this.setCurrentCustomer(updated);
+
+      if (this.isConfigured()) {
+        try {
+          await this.client
+            .from('customers')
+            .update({
+              name: updated.name,
+              phone: updated.phone,
+              address: updated.address
+            })
+            .eq('email', current.email);
+        } catch (e) {
+          console.warn('[Supabase] updateCustomerProfile cloud error:', e);
+        }
+      }
+      return { success: true, customer: updated };
+    }
+
+    async getCustomerOrders(email, phone) {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      let orders = [];
+
+      // Fetch from Supabase
+      if (this.isConfigured()) {
+        try {
+          const allOrders = await this.fetchOrders();
+          if (Array.isArray(allOrders)) {
+            orders = allOrders.filter(o => {
+              const cust = o.customer || {};
+              const orderEmail = (cust.email || '').toLowerCase();
+              const orderPhone = (cust.phone || '').trim();
+              return (cleanEmail && orderEmail === cleanEmail) || (phone && orderPhone === phone);
+            });
+          }
+        } catch (err) {
+          console.warn('[Supabase] getCustomerOrders error:', err);
+        }
+      }
+
+      // If empty or offline, check local storage orders
+      if (!orders || orders.length === 0) {
+        try {
+          const localOrders = JSON.parse(localStorage.getItem('mm_orders') || '[]');
+          orders = localOrders.filter(o => {
+            const cust = o.customer || {};
+            const orderEmail = (cust.email || '').toLowerCase();
+            const orderPhone = (cust.phone || '').trim();
+            return (cleanEmail && orderEmail === cleanEmail) || (phone && orderPhone === phone);
+          });
+        } catch (e) {}
+      }
+
+      return orders;
+    }
   }
 
   // Expose globally

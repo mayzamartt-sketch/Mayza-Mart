@@ -1668,9 +1668,86 @@ function simulateNewCustomerOrder() {
 }
 
 // =========================================================
+// ADMIN MASTER AUTHENTICATION ENGINE
+// =========================================================
+const ADMIN_MASTER_PASSCODE = "Mayza*000";
+
+function initAdminAuth() {
+  const lockScreen = document.getElementById("adminLockScreen");
+  const lockForm = document.getElementById("adminLockForm");
+  const passwordInput = document.getElementById("adminPasswordInput");
+  const togglePassBtn = document.getElementById("toggleAdminPassVisibility");
+  const errorMsg = document.getElementById("lockErrorMsg");
+  const logoutBtn = document.getElementById("adminLogoutBtn");
+  const lockCard = document.querySelector(".admin-lock-card");
+
+  if (!lockScreen) return;
+
+  const isAuthed = sessionStorage.getItem("mm_admin_auth") === "true";
+  if (isAuthed) {
+    lockScreen.classList.add("unlocked");
+  } else {
+    lockScreen.classList.remove("unlocked");
+    setTimeout(() => passwordInput?.focus(), 300);
+  }
+
+  // Toggle password visibility
+  togglePassBtn?.addEventListener("click", () => {
+    if (passwordInput.type === "password") {
+      passwordInput.type = "text";
+      togglePassBtn.textContent = "🙈";
+    } else {
+      passwordInput.type = "password";
+      togglePassBtn.textContent = "👁️";
+    }
+  });
+
+  // Handle unlock form submission
+  lockForm?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const entered = passwordInput.value.trim();
+
+    if (entered === ADMIN_MASTER_PASSCODE) {
+      sessionStorage.setItem("mm_admin_auth", "true");
+      lockScreen.classList.add("unlocked");
+      if (errorMsg) errorMsg.textContent = "";
+      passwordInput.value = "";
+      showToast("Welcome back to Wonderland Studio, Founders! ✦");
+      triggerCelebration();
+      audio?.playSuccess();
+    } else {
+      if (errorMsg) errorMsg.textContent = "Incorrect Master Passcode. Access denied.";
+      if (lockCard) {
+        lockCard.classList.remove("shake");
+        void lockCard.offsetWidth;
+        lockCard.classList.add("shake");
+      }
+      passwordInput.value = "";
+      passwordInput.focus();
+      audio?.playBubblePop(220);
+    }
+  });
+
+  // Handle logout
+  logoutBtn?.addEventListener("click", () => {
+    if (confirm("Lock Wonderland Studio session and log out?")) {
+      sessionStorage.removeItem("mm_admin_auth");
+      lockScreen.classList.remove("unlocked");
+      if (passwordInput) {
+        passwordInput.value = "";
+        passwordInput.focus();
+      }
+      showToast("Admin Studio locked.");
+      audio?.playClick();
+    }
+  });
+}
+
+// =========================================================
 // 14. EVENT LISTENERS SETUP
 // =========================================================
 document.addEventListener("DOMContentLoaded", () => {
+  initAdminAuth();
   startLiveClock();
   renderDashboardOverview();
 

@@ -153,3 +153,24 @@ ON public.reviews FOR ALL
 USING (true)
 WITH CHECK (true);
 
+-- ---------------------------------------------------------
+-- 7. CUSTOMERS TABLE (Storefront Accounts)
+-- ---------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.customers (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    phone TEXT,
+    address TEXT,
+    password TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all operations on customers"
+ON public.customers FOR ALL
+USING (true)
+WITH CHECK (true);
+
+

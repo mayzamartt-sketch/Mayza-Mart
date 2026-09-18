@@ -726,12 +726,21 @@ class MayzaEntranceApp {
   }
 
   initStorefrontInteractions() {
-    // Interactive Add to Cart buttons
+    // Interactive Add to Cart buttons with Customer Auth Gatekeeper
     document.querySelectorAll('.add-to-cart-action-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const card = btn.closest('.product-item-card');
         const name = card ? card.getAttribute('data-name') : 'Item';
+
+        // Gatekeeper check: User must be signed in to add items to cart!
+        const currentCustomer = window.mayzaSupabase?.getCurrentCustomer();
+        if (!currentCustomer) {
+          this.pendingCartAction = { name };
+          this.openCustomerAuthModal("Please sign in or create an account to add items to your cart! 🛍️");
+          return;
+        }
+
         this.addToCart(name);
       });
     });
@@ -764,6 +773,459 @@ class MayzaEntranceApp {
 
     // Initialize traveling mascot guide companion
     this.initTravelingMascot();
+
+    // Initialize Customer Authentication & Dashboard Gateway
+    this.initCustomerAuthAndDashboard();
+  }
+
+  // =========================================================
+  // CUSTOMER AUTH & DASHBOARD ORCHESTRATION
+  // =========================================================
+  initCustomerAuthAndDashboard() {
+    const authModal = document.getElementById('customerAuthModal');
+    const closeAuthBtn = document.getElementById('closeCustomerAuthModalBtn');
+    const dashModal = document.getElementById('customerDashboardModal');
+    const closeDashBtn = document.getElementById('closeCustomerDashboardModalBtn');
+    const accountBtn = document.getElementById('customerAccountBtn');
+
+    // Tab buttons in Auth Modal
+    const tabLogin = document.getElementById('authTabLogin');
+    const tabRegister = document.getElementById('authTabRegister');
+    const formLogin = document.getElementById('customerLoginForm');
+    const formRegister = document.getElementById('customerRegisterForm');
+    const switchToReg = document.getElementById('switchToRegisterBtn');
+    const switchToLog = document.getElementById('switchToLoginBtn');
+
+    // Forms & inputs
+    const togglePw = document.getElementById('toggleLoginPwBtn');
+    const loginPwInput = document.getElementById('loginPasswordInput');
+    const loginEmailInput = document.getElementById('loginEmailInput');
+    const loginFeedback = document.getElementById('loginFeedbackMsg');
+
+    const regNameInput = document.getElementById('regNameInput');
+    const regEmailInput = document.getElementById('regEmailInput');
+    const regPhoneInput = document.getElementById('regPhoneInput');
+    const regPassInput = document.getElementById('regPasswordInput');
+    const regAddressInput = document.getElementById('regAddressInput');
+    const regFeedback = document.getElementById('regFeedbackMsg');
+
+    // Dashboard tabs
+    const dashTabOrders = document.getElementById('dashTabOrders');
+    const dashTabProfile = document.getElementById('dashTabProfile');
+    const dashTabWishlist = document.getElementById('dashTabWishlist');
+    const dashOrdersPanel = document.getElementById('dashOrdersPanel');
+    const dashProfilePanel = document.getElementById('dashProfilePanel');
+    const dashWishlistPanel = document.getElementById('dashWishlistPanel');
+
+    const profileForm = document.getElementById('customerProfileUpdateForm');
+    const logoutBtn = document.getElementById('customerLogoutBtn');
+    const continueShoppingBtn = document.getElementById('dashContinueShoppingBtn');
+
+    // Tab switching in Auth modal
+    const setAuthTab = (tab) => {
+      if (tab === 'register') {
+        tabRegister?.classList.add('active');
+        tabLogin?.classList.remove('active');
+        if (formRegister) formRegister.style.display = 'flex';
+        if (formLogin) formLogin.style.display = 'none';
+        if (regFeedback) regFeedback.textContent = '';
+      } else {
+        tabLogin?.classList.add('active');
+        tabRegister?.classList.remove('active');
+        if (formLogin) formLogin.style.display = 'flex';
+        if (formRegister) formRegister.style.display = 'none';
+        if (loginFeedback) loginFeedback.textContent = '';
+      }
+    };
+
+    tabLogin?.addEventListener('click', () => setAuthTab('login'));
+    tabRegister?.addEventListener('click', () => setAuthTab('register'));
+    switchToReg?.addEventListener('click', () => setAuthTab('register'));
+    switchToLog?.addEventListener('click', () => setAuthTab('login'));
+
+    // Toggle password visibility
+    togglePw?.addEventListener('click', () => {
+      if (loginPwInput.type === 'password') {
+        loginPwInput.type = 'text';
+        togglePw.textContent = '🙈';
+      } else {
+        loginPwInput.type = 'password';
+        togglePw.textContent = '👁️';
+      }
+    });
+
+    // Close modal handlers
+    closeAuthBtn?.addEventListener('click', () => this.closeCustomerAuthModal());
+    closeDashBtn?.addEventListener('click', () => this.closeCustomerDashboardModal());
+    continueShoppingBtn?.addEventListener('click', () => this.closeCustomerDashboardModal());
+
+    authModal?.addEventListener('click', (e) => {
+      if (e.target === authModal) this.closeCustomerAuthModal();
+    });
+    dashModal?.addEventListener('click', (e) => {
+      if (e.target === dashModal) this.closeCustomerDashboardModal();
+    });
+
+    // Account Button Click: Open Dashboard if logged in, or Auth Modal if logged out
+    accountBtn?.addEventListener('click', () => {
+      const customer = window.mayzaSupabase?.getCurrentCustomer();
+      if (customer) {
+        this.openCustomerDashboardModal();
+      } else {
+        this.openCustomerAuthModal("Sign in to your Mayza Mart account or create a new one! 🌸");
+      }
+    });
+
+    // Sign In Form Submit
+    formLogin?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = loginEmailInput.value.trim();
+      const password = loginPwInput.value;
+      const submitBtn = document.getElementById('loginSubmitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>Signing in... ⏳</span>';
+      if (loginFeedback) loginFeedback.textContent = '';
+
+      try {
+        const res = await window.mayzaSupabase.loginCustomer({ email, password });
+        if (res.success) {
+          this.closeCustomerAuthModal();
+          this.updateCustomerHeaderUI();
+          this.celebrateConfetti();
+          this.sound.playSparkleChime();
+
+          if (this.pendingCartAction) {
+            const item = this.pendingCartAction.name;
+            this.addToCart(item);
+            this.showToast(`Welcome back, ${res.customer.name}! Added "${item}" to your cart! 🛍️`);
+            this.pendingCartAction = null;
+          } else {
+            this.showToast(`Welcome back to Mayza Mart, ${res.customer.name}! 💕`);
+          }
+          loginPwInput.value = '';
+        } else {
+          if (loginFeedback) loginFeedback.textContent = res.message || 'Login failed. Please check credentials.';
+          this.sound.playBubblePop(240);
+        }
+      } catch (err) {
+        if (loginFeedback) loginFeedback.textContent = 'Login error: ' + err.message;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Sign In &amp; Continue</span><span class="btn-arrow">➔</span>';
+      }
+    });
+
+    // Create Account Form Submit
+    formRegister?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = regNameInput.value.trim();
+      const email = regEmailInput.value.trim();
+      const phone = regPhoneInput.value.trim();
+      const password = regPassInput.value;
+      const address = regAddressInput.value.trim();
+      const submitBtn = document.getElementById('registerSubmitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>Creating Account... ⏳</span>';
+      if (regFeedback) regFeedback.textContent = '';
+
+      try {
+        const res = await window.mayzaSupabase.registerCustomer({ name, email, phone, address, password });
+        if (res.success) {
+          this.closeCustomerAuthModal();
+          this.updateCustomerHeaderUI();
+          this.celebrateConfetti();
+          this.sound.playSparkleChime();
+
+          if (this.pendingCartAction) {
+            const item = this.pendingCartAction.name;
+            this.addToCart(item);
+            this.showToast(`Account created! Welcome, ${res.customer.name}! Added "${item}" to cart! 🎉`);
+            this.pendingCartAction = null;
+          } else {
+            this.showToast(`Welcome to Mayza Mart Family, ${res.customer.name}! 🌸`);
+          }
+          regPassInput.value = '';
+        } else {
+          if (regFeedback) regFeedback.textContent = res.message || 'Registration failed.';
+          this.sound.playBubblePop(240);
+        }
+      } catch (err) {
+        if (regFeedback) regFeedback.textContent = 'Registration error: ' + err.message;
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Create Account &amp; Continue</span><span class="btn-arrow">➔</span>';
+      }
+    });
+
+    // Profile update form
+    profileForm?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('profileNameInput').value.trim();
+      const phone = document.getElementById('profilePhoneInput').value.trim();
+      const address = document.getElementById('profileAddressInput').value.trim();
+
+      const res = await window.mayzaSupabase.updateCustomerProfile({ name, phone, address });
+      if (res.success) {
+        this.showToast('Profile & shipping details updated! 💾');
+        this.updateCustomerHeaderUI();
+        this.sound.playSparkleChime();
+      } else {
+        this.showToast(res.message || 'Failed to update profile');
+      }
+    });
+
+    // Dashboard Tabs Switching
+    const setDashTab = (tab) => {
+      [dashTabOrders, dashTabProfile, dashTabWishlist].forEach(b => b?.classList.remove('active'));
+      [dashOrdersPanel, dashProfilePanel, dashWishlistPanel].forEach(p => {
+        if (p) p.style.display = 'none';
+      });
+
+      if (tab === 'profile') {
+        dashTabProfile?.classList.add('active');
+        if (dashProfilePanel) dashProfilePanel.style.display = 'block';
+      } else if (tab === 'wishlist') {
+        dashTabWishlist?.classList.add('active');
+        if (dashWishlistPanel) dashWishlistPanel.style.display = 'block';
+        this.renderCustomerWishlist();
+      } else {
+        dashTabOrders?.classList.add('active');
+        if (dashOrdersPanel) dashOrdersPanel.style.display = 'block';
+        this.renderCustomerOrders();
+      }
+    };
+
+    dashTabOrders?.addEventListener('click', () => setDashTab('orders'));
+    dashTabProfile?.addEventListener('click', () => setDashTab('profile'));
+    dashTabWishlist?.addEventListener('click', () => setDashTab('wishlist'));
+
+    // Logout
+    logoutBtn?.addEventListener('click', () => {
+      if (confirm("Are you sure you want to sign out?")) {
+        window.mayzaSupabase?.logoutCustomer();
+        this.closeCustomerDashboardModal();
+        this.updateCustomerHeaderUI();
+        this.showToast("You've been signed out. See you soon! 💕");
+        this.sound.playBubblePop(440);
+      }
+    });
+
+    // Listen to custom customer auth change events
+    window.addEventListener('mayza:customer-auth-changed', () => {
+      this.updateCustomerHeaderUI();
+    });
+
+    // Initial check on load
+    this.updateCustomerHeaderUI();
+  }
+
+  openCustomerAuthModal(noticeText) {
+    const modal = document.getElementById('customerAuthModal');
+    const notice = document.getElementById('authGateNotice');
+    if (notice && noticeText) notice.textContent = noticeText;
+    modal?.classList.add('active');
+    modal?.setAttribute('aria-hidden', 'false');
+    this.sound.playBubblePop(660);
+  }
+
+  closeCustomerAuthModal() {
+    const modal = document.getElementById('customerAuthModal');
+    modal?.classList.remove('active');
+    modal?.setAttribute('aria-hidden', 'true');
+  }
+
+  async openCustomerDashboardModal() {
+    const modal = document.getElementById('customerDashboardModal');
+    const customer = window.mayzaSupabase?.getCurrentCustomer();
+    if (!customer) return;
+
+    // Pre-fill header
+    const avatar = document.getElementById('dashUserAvatar');
+    const nameEl = document.getElementById('dashUserName');
+    const emailEl = document.getElementById('dashUserEmail');
+    const phoneEl = document.getElementById('dashUserPhone');
+
+    if (avatar) avatar.textContent = (customer.name || 'M').charAt(0).toUpperCase();
+    if (nameEl) nameEl.textContent = customer.name || 'Mayza Shopper';
+    if (emailEl) emailEl.textContent = customer.email || '';
+    if (phoneEl) phoneEl.textContent = customer.phone || 'No phone added';
+
+    // Pre-fill profile form
+    const pName = document.getElementById('profileNameInput');
+    const pEmail = document.getElementById('profileEmailInput');
+    const pPhone = document.getElementById('profilePhoneInput');
+    const pAddress = document.getElementById('profileAddressInput');
+
+    if (pName) pName.value = customer.name || '';
+    if (pEmail) pEmail.value = customer.email || '';
+    if (pPhone) pPhone.value = customer.phone || '';
+    if (pAddress) pAddress.value = customer.address || '';
+
+    modal?.classList.add('active');
+    modal?.setAttribute('aria-hidden', 'false');
+    this.sound.playSparkleChime();
+
+    // Render Orders
+    await this.renderCustomerOrders();
+  }
+
+  closeCustomerDashboardModal() {
+    const modal = document.getElementById('customerDashboardModal');
+    modal?.classList.remove('active');
+    modal?.setAttribute('aria-hidden', 'true');
+  }
+
+  updateCustomerHeaderUI() {
+    const customer = window.mayzaSupabase?.getCurrentCustomer();
+    const iconWrap = document.getElementById('accountIconWrap');
+    const avatar = document.getElementById('accountUserAvatar');
+    const namePill = document.getElementById('accountNamePill');
+    const accountBtn = document.getElementById('customerAccountBtn');
+
+    if (customer) {
+      if (iconWrap) iconWrap.style.display = 'none';
+      if (avatar) {
+        avatar.style.display = 'flex';
+        avatar.textContent = (customer.name || 'M').charAt(0).toUpperCase();
+      }
+      if (namePill) {
+        namePill.style.display = 'inline-block';
+        const firstName = customer.name.split(' ')[0] || 'Member';
+        namePill.textContent = firstName;
+      }
+      if (accountBtn) accountBtn.title = `Signed in as ${customer.name} (Click for Dashboard)`;
+    } else {
+      if (iconWrap) iconWrap.style.display = 'inline-flex';
+      if (avatar) avatar.style.display = 'none';
+      if (namePill) namePill.style.display = 'none';
+      if (accountBtn) accountBtn.title = 'Sign In / My Dashboard';
+    }
+  }
+
+  async renderCustomerOrders() {
+    const customer = window.mayzaSupabase?.getCurrentCustomer();
+    const container = document.getElementById('dashOrdersList');
+    const countBadge = document.getElementById('dashOrdersCountBadge');
+    if (!container || !customer) return;
+
+    container.innerHTML = '<div style="text-align:center; padding: 2rem; color:#8F5E6B;">Loading your orders... ⏳</div>';
+
+    const orders = await window.mayzaSupabase?.getCustomerOrders(customer.email, customer.phone) || [];
+    if (countBadge) countBadge.textContent = orders.length;
+
+    if (!orders || orders.length === 0) {
+      container.innerHTML = `
+        <div class="dashboard-empty-orders">
+          <div class="dashboard-empty-icon">🛍️</div>
+          <h4 style="margin: 0 0 6px; font-size: 1.1rem; color: #38121C;">No Orders Placed Yet</h4>
+          <p style="margin: 0; font-size: 0.85rem;">Explore our bestsellers and cute accessories to treat yourself or gift a loved one!</p>
+        </div>
+      `;
+      return;
+    }
+
+    const stages = [
+      { key: 'New', label: '1. Placed' },
+      { key: 'Packed', label: '2. Packed' },
+      { key: 'Shipped', label: '3. Shipped' },
+      { key: 'Delivered', label: '4. Delivered' }
+    ];
+
+    container.innerHTML = orders.map(order => {
+      const orderStatus = order.status || 'New';
+      const currentIdx = stages.findIndex(s => s.key.toLowerCase() === orderStatus.toLowerCase());
+      const activeIdx = currentIdx >= 0 ? currentIdx : 0;
+
+      const stepperHtml = stages.map((s, idx) => {
+        let stepClass = 'tracker-step';
+        if (idx < activeIdx) stepClass += ' completed';
+        else if (idx === activeIdx) stepClass += ' active';
+
+        const dotSymbol = idx < activeIdx ? '✓' : (idx + 1);
+
+        return `
+          <div class="${stepClass}">
+            <div class="tracker-dot">${dotSymbol}</div>
+            <span class="tracker-label">${s.label}</span>
+          </div>
+        `;
+      }).join('');
+
+      const itemsHtml = (order.items || []).map(item => `
+        <div class="order-item-row">
+          <span>${item.qty || 1}x ${item.name || 'Item'}</span>
+          <span>₹${(item.price || 0) * (item.qty || 1)}</span>
+        </div>
+      `).join('');
+
+      return `
+        <div class="customer-order-card">
+          <div class="order-card-header">
+            <div>
+              <span class="order-id-tag">${order.id}</span>
+              <div class="order-date-text">📅 ${order.rawDate || 'Recently placed'}</div>
+            </div>
+            <span class="order-status-badge ${orderStatus.toLowerCase()}">${orderStatus}</span>
+          </div>
+
+          <!-- Real-Time Delivery Stepper -->
+          <div class="order-tracker-stepper">
+            ${stepperHtml}
+          </div>
+
+          <div class="order-items-summary">
+            ${itemsHtml || '<div class="order-item-row"><span>Custom order package</span></div>'}
+            <div class="order-card-total-row">
+              <span>Total Amount:</span>
+              <span style="color:#D9657B;">₹${order.total || 0}</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  renderCustomerWishlist() {
+    const container = document.getElementById('dashWishlistList');
+    if (!container) return;
+    const activeFavs = document.querySelectorAll('.favorite-heart-btn.active');
+
+    if (!activeFavs || activeFavs.length === 0) {
+      container.innerHTML = `
+        <div class="dashboard-empty-orders">
+          <div class="dashboard-empty-icon">💖</div>
+          <h4 style="margin: 0 0 6px; font-size: 1.1rem; color: #38121C;">Your Wishlist is Empty</h4>
+          <p style="margin: 0; font-size: 0.85rem;">Tap the ♥ heart icon on any product in the store to save it here for later!</p>
+        </div>
+      `;
+      return;
+    }
+
+    const items = [];
+    activeFavs.forEach(btn => {
+      const card = btn.closest('.product-item-card');
+      if (card) {
+        const name = card.getAttribute('data-name') || 'Item';
+        const price = card.querySelector('.prod-price-text')?.textContent || '₹199';
+        const img = card.querySelector('img')?.src || '';
+        items.push({ name, price, img });
+      }
+    });
+
+    container.innerHTML = `
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem;">
+        ${items.map(it => `
+          <div style="background:#FFFDFD; border:1.5px solid #FFD1DA; border-radius:16px; padding:12px; text-align:center;">
+            <img src="${it.img}" alt="${it.name}" style="width:100%; height:110px; object-fit:cover; border-radius:12px; margin-bottom:8px;">
+            <h5 style="margin:0 0 4px; font-size:0.88rem; color:#38121C;">${it.name}</h5>
+            <p style="margin:0 0 8px; font-weight:800; color:#D9657B;">${it.price}</p>
+            <button class="auth-primary-submit-btn" style="padding:6px 12px; font-size:0.78rem;" onclick="window.mayzaApp?.addToCart('${it.name.replace(/'/g, "\\'")}')">
+              Move to Cart 🛒
+            </button>
+          </div>
+        `).join('')}
+      </div>
+    `;
   }
 
   initTravelingMascot() {

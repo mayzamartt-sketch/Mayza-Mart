@@ -22,6 +22,43 @@
 </head>
 <body class="studio-theme">
 
+  <!-- ============================================ -->
+  <!-- ADMIN MASTER PASSCODE LOCK OVERLAY           -->
+  <!-- ============================================ -->
+  <div class="admin-lock-overlay" id="adminLockScreen">
+    <div class="admin-lock-card">
+      <div class="lock-mascot-glow">
+        <img src="mascot.png" alt="Mayza Mascot" class="lock-mascot-img">
+        <span class="lock-sparkle sp1">✨</span>
+        <span class="lock-sparkle sp2">🌸</span>
+      </div>
+      <div class="lock-badge">
+        <span class="lock-badge-dot"></span>
+        <span>Executive Studio Gateway</span>
+      </div>
+      <h2 class="lock-title">Wonderland Admin Studio</h2>
+      <p class="lock-subtitle">Private command center for <strong>Mauji</strong>, <strong>Aynul</strong> &amp; <strong>Faiza</strong>. Enter your master studio passcode to proceed.</p>
+
+      <form id="adminLockForm" class="lock-form">
+        <div class="lock-input-wrap">
+          <span class="lock-input-icon">🔑</span>
+          <input type="password" id="adminPasswordInput" class="lock-input" placeholder="Enter Master Studio Passcode" autofocus autocomplete="current-password" required>
+          <button type="button" class="lock-reveal-btn" id="toggleAdminPassVisibility" title="Show/Hide Passcode" aria-label="Toggle Password Visibility">👁️</button>
+        </div>
+        <p class="lock-hint-msg" id="lockErrorMsg"></p>
+        <button type="submit" class="lock-submit-btn" id="adminUnlockBtn">
+          <span class="lock-submit-text">Unlock Studio</span>
+          <span class="lock-submit-icon">➔</span>
+        </button>
+      </form>
+
+      <div class="lock-card-footer">
+        <a href="/" class="lock-return-link">← Return to Customer Store</a>
+        <span class="lock-security-tag">🔒 End-to-End Encrypted Session</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Ambient Glowing Cosmos Background -->
   <div class="ambient-cosmos" aria-hidden="true">
     <div class="nebula nebula-rose"></div>
@@ -111,6 +148,11 @@
             <span class="user-status">Online ✦</span>
           </div>
         </div>
+
+        <!-- Admin Lock / Logout Button -->
+        <button class="studio-icon-btn admin-logout-btn" id="adminLogoutBtn" title="Lock & Logout Admin Studio" aria-label="Lock Admin">
+          <span>🔒</span>
+        </button>
       </div>
     </header>
 
