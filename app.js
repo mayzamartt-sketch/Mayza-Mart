@@ -776,7 +776,85 @@ class MayzaEntranceApp {
 
     // Initialize Customer Authentication & Dashboard Gateway
     this.initCustomerAuthAndDashboard();
+
+    // Sync live announcement banner and coupons from Supabase & Admin in real time
+    this.syncLiveBannersAndCoupons();
   }
+
+  // =========================================================
+  // LIVE STORE BANNER & COUPON REAL-TIME SYNC
+  // =========================================================
+  async syncLiveBannersAndCoupons() {
+    const updateBannerUI = (text) => {
+      if (!text) return;
+      const t1 = document.getElementById('liveAnnouncementText1');
+      const t2 = document.getElementById('liveAnnouncementText2');
+      if (t1) t1.textContent = text;
+      if (t2) t2.textContent = text;
+    };
+
+    const updateCouponUI = (coupon) => {
+      const tag = document.getElementById('sideBannerCouponTag');
+      const code = document.getElementById('sideBannerCouponCode');
+      if (coupon && coupon.code) {
+        if (tag) tag.textContent = `${coupon.discount}% OFF • ${coupon.desc || 'Special Welcome Perk'}`;
+        if (code) code.innerHTML = `Use Code: <strong>${coupon.code}</strong>`;
+      }
+    };
+
+    // 1. Initial cached values
+    const cachedBanner = localStorage.getItem('mm_announcement_banner');
+    if (cachedBanner) updateBannerUI(cachedBanner);
+
+    // 2. Fetch live from Supabase
+    if (window.mayzaSupabase) {
+      try {
+        const banners = await window.mayzaSupabase.getStoreBanners();
+        if (banners && banners.announcement) {
+          updateBannerUI(banners.announcement);
+        }
+
+        const coupons = await window.mayzaSupabase.fetchCoupons();
+        const activeCoupons = Array.isArray(coupons) ? coupons.filter(c => c.active !== false && c.code !== 'STORE_BANNER') : [];
+        if (activeCoupons.length > 0) {
+          updateCouponUI(activeCoupons[0]);
+        }
+      } catch (err) {
+        console.warn('[Storefront] syncLiveBannersAndCoupons error:', err);
+      }
+    }
+
+    // 3. Listen to live updates in real time
+    window.addEventListener('mayza:banner-updated', (e) => {
+      if (e.detail?.announcement) {
+        updateBannerUI(e.detail.announcement);
+      }
+    });
+
+    window.addEventListener('mayza:coupons-updated', async () => {
+      if (window.mayzaSupabase) {
+        const coupons = await window.mayzaSupabase.fetchCoupons();
+        const activeCoupons = Array.isArray(coupons) ? coupons.filter(c => c.active !== false && c.code !== 'STORE_BANNER') : [];
+        if (activeCoupons.length > 0) {
+          updateCouponUI(activeCoupons[0]);
+        }
+      }
+    });
+
+    // 4. Cross-tab real-time storage listener (Admin in one tab -> Storefront in another tab updates instantly)
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'mm_announcement_banner' && e.newValue) {
+        updateBannerUI(e.newValue);
+      }
+      if (e.key === 'mm_coupons' && e.newValue) {
+        try {
+          const list = JSON.parse(e.newValue);
+          if (Array.isArray(list) && list.length > 0) {
+            updateCouponUI(list[0]);
+          }
+        } catch (err) {}
+      }
+    });
 
   // =========================================================
   // CUSTOMER AUTH & DASHBOARD ORCHESTRATION

@@ -958,11 +958,21 @@ function copyCouponCode(code) {
   audio.playClick();
 }
 
-function deleteCoupon(index) {
+async function deleteCoupon(index) {
+  const coupon = state.coupons[index];
+  if (!coupon) return;
   state.coupons.splice(index, 1);
   state.save();
   renderCoupons();
   showToast("Coupon removed.");
+
+  if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+    try {
+      await window.mayzaSupabase.deleteCoupon(coupon.code);
+    } catch (err) {
+      console.warn('[Admin] Cloud deleteCoupon error:', err);
+    }
+  }
 }
 
 function openAddCouponModal() {
@@ -975,19 +985,31 @@ function closeCouponModal() {
   document.getElementById("couponModal").classList.remove("active");
 }
 
-function handleCouponFormSubmit(e) {
+async function handleCouponFormSubmit(e) {
   e.preventDefault();
   const code = document.getElementById("couponCode").value.trim().toUpperCase();
   const discount = parseInt(document.getElementById("couponDiscount").value) || 10;
   const minSpend = parseInt(document.getElementById("couponMinSpend").value) || 0;
   const desc = document.getElementById("couponDesc").value.trim() || `${discount}% off Mayza Mart wonderland order`;
 
-  state.coupons.unshift({ code, discount, minSpend, desc, active: true, uses: 0 });
+  const newCoupon = { code, discount, minSpend, desc, active: true, uses: 0 };
+  state.coupons.unshift(newCoupon);
   state.save();
   closeCouponModal();
   renderCoupons();
   showToast(`Created new wonder coupon: ${code} ✨`);
   triggerCelebration();
+  audio?.playSuccess();
+
+  // Instantly push to Supabase Cloud so live store receives it immediately
+  if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+    try {
+      await window.mayzaSupabase.upsertCoupon(newCoupon);
+      showToast(`Coupon ${code} synced live to Supabase! ⚡`);
+    } catch (err) {
+      console.warn('[Admin] Cloud upsertCoupon error:', err);
+    }
+  }
 }
 
 // =========================================================
@@ -1911,12 +1933,41 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("cancelCouponBtn")?.addEventListener("click", closeCouponModal);
   document.getElementById("couponForm")?.addEventListener("submit", handleCouponFormSubmit);
 
-  // Storefront top banner save
-  document.getElementById("saveMarqueeBtn")?.addEventListener("click", () => {
-    const text = document.getElementById("marqueeTextInput")?.value;
-    localStorage.setItem("mm_marquee", text);
-    showToast("Storefront announcement banner updated live! 📢");
-    triggerCelebration();
+  // Storefront top banner save & live cloud sync
+  const marqueeInput = document.getElementById("marqueeTextInput");
+  const saveMarqueeBtn = document.getElementById("saveMarqueeBtn");
+
+  if (marqueeInput && window.mayzaSupabase) {
+    window.mayzaSupabase.getStoreBanners().then(res => {
+      if (res && res.announcement) marqueeInput.value = res.announcement;
+    }).catch(console.warn);
+  }
+
+  saveMarqueeBtn?.addEventListener("click", async () => {
+    const text = marqueeInput?.value?.trim();
+    if (!text) {
+      showToast("Please enter an announcement message first.", "warning");
+      return;
+    }
+
+    saveMarqueeBtn.disabled = true;
+    saveMarqueeBtn.innerHTML = "<span>Publishing... ⏳</span>";
+
+    try {
+      if (window.mayzaSupabase) {
+        await window.mayzaSupabase.saveStoreBanners(text);
+      } else {
+        localStorage.setItem("mm_announcement_banner", text);
+      }
+      showToast("Announcement banner published live to store! 📢✨");
+      triggerCelebration();
+      audio?.playSuccess();
+    } catch (err) {
+      showToast(`Banner save error: ${err.message}`, "warning");
+    } finally {
+      saveMarqueeBtn.disabled = false;
+      saveMarqueeBtn.innerHTML = "<span>⚡ Publish Live to Store</span>";
+    }
   });
 
   // Global search (Ctrl + K)

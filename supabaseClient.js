@@ -303,19 +303,23 @@
     // =========================================================
     // COUPONS, VIPS, REVIEWS
     // =========================================================
+    // COUPONS & STOREFRONT BANNERS
+    // =========================================================
     async fetchCoupons() {
       if (!this.isConfigured()) return null;
       try {
         const { data, error } = await this.client.from('coupons').select('*');
         if (error) throw error;
-        return data.map(c => ({
-          code: c.code,
-          discount: Number(c.discount),
-          minSpend: Number(c.min_spend),
-          desc: c.desc,
-          active: Boolean(c.active),
-          uses: Number(c.uses || 0)
-        }));
+        return data
+          .filter(c => c.code !== 'STORE_BANNER')
+          .map(c => ({
+            code: c.code,
+            discount: Number(c.discount),
+            minSpend: Number(c.min_spend),
+            desc: c.desc,
+            active: Boolean(c.active),
+            uses: Number(c.uses || 0)
+          }));
       } catch (err) {
         console.warn('[Supabase] fetchCoupons error:', err);
         return null;
@@ -335,11 +339,83 @@
         };
         const { data, error } = await this.client.from('coupons').upsert(row).select();
         if (error) throw error;
+        window.dispatchEvent(new CustomEvent('mayza:coupons-updated', { detail: { coupon } }));
         return data ? data[0] : row;
       } catch (err) {
         console.error('[Supabase] upsertCoupon error:', err);
         throw err;
       }
+    }
+
+    async deleteCoupon(code) {
+      if (!this.isConfigured()) return false;
+      try {
+        const { error } = await this.client.from('coupons').delete().eq('code', code);
+        if (error) throw error;
+        window.dispatchEvent(new CustomEvent('mayza:coupons-updated', { detail: { deletedCode: code } }));
+        return true;
+      } catch (err) {
+        console.error('[Supabase] deleteCoupon error:', err);
+        throw err;
+      }
+    }
+
+    // =========================================================
+    // LIVE STOREFRONT BANNERS & ANNOUNCEMENTS
+    // =========================================================
+    async getStoreBanners() {
+      const defaultAnnouncement = "✨ Free Express Delivery Across India on Orders Over ₹499 • Welcome to Mayza Mart! 💖 • 🎁 Handpicked Cute Finds & Gifts • 🌸 Handcrafted With Love By 3 Cousins ✨";
+      const cached = localStorage.getItem('mm_announcement_banner') || defaultAnnouncement;
+
+      if (!this.isConfigured()) {
+        return { announcement: cached };
+      }
+
+      try {
+        const { data, error } = await this.client
+          .from('coupons')
+          .select('*')
+          .eq('code', 'STORE_BANNER')
+          .limit(1);
+
+        if (!error && data && data.length > 0 && data[0].desc) {
+          localStorage.setItem('mm_announcement_banner', data[0].desc);
+          return { announcement: data[0].desc };
+        }
+      } catch (err) {
+        console.warn('[Supabase] getStoreBanners error:', err);
+      }
+
+      return { announcement: cached };
+    }
+
+    async saveStoreBanners(announcementText) {
+      const text = (announcementText || '').trim();
+      if (!text) return false;
+
+      localStorage.setItem('mm_announcement_banner', text);
+
+      if (this.isConfigured()) {
+        try {
+          const row = {
+            code: 'STORE_BANNER',
+            discount: 0,
+            min_spend: 0,
+            desc: text,
+            active: true,
+            uses: 0
+          };
+          await this.client.from('coupons').upsert(row);
+        } catch (err) {
+          console.warn('[Supabase] saveStoreBanners cloud error:', err);
+        }
+      }
+
+      window.dispatchEvent(new CustomEvent('mayza:banner-updated', {
+        detail: { announcement: text }
+      }));
+
+      return true;
     }
 
     async fetchVips() {
