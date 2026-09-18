@@ -1,7 +1,7 @@
 -- =========================================================
 -- MAYZA MART • SUPABASE DATABASE SCHEMA
 -- Curated for Mauji, Aynul & Faiza
--- Execute this script in your Supabase SQL Editor
+-- Safe to execute repeatedly (idempotent with DROP POLICY IF EXISTS)
 -- =========================================================
 
 -- Enable UUID extension if needed
@@ -24,15 +24,14 @@ CREATE TABLE IF NOT EXISTS public.products (
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- Enable RLS
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 
--- Allow public read of active products
+DROP POLICY IF EXISTS "Allow public read access on products" ON public.products;
 CREATE POLICY "Allow public read access on products"
 ON public.products FOR SELECT
 USING (true);
 
--- Allow full access for anon & authenticated users (Admin / Storefront)
+DROP POLICY IF EXISTS "Allow all operations on products" ON public.products;
 CREATE POLICY "Allow all operations on products"
 ON public.products FOR ALL
 USING (true)
@@ -56,10 +55,12 @@ CREATE TABLE IF NOT EXISTS public.orders (
 
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow public read on orders" ON public.orders;
 CREATE POLICY "Allow public read on orders"
 ON public.orders FOR SELECT
 USING (true);
 
+DROP POLICY IF EXISTS "Allow all operations on orders" ON public.orders;
 CREATE POLICY "Allow all operations on orders"
 ON public.orders FOR ALL
 USING (true)
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS public.wholesale_purchases (
 
 ALTER TABLE public.wholesale_purchases ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all operations on wholesale_purchases" ON public.wholesale_purchases;
 CREATE POLICY "Allow all operations on wholesale_purchases"
 ON public.wholesale_purchases FOR ALL
 USING (true)
@@ -109,6 +111,7 @@ CREATE TABLE IF NOT EXISTS public.coupons (
 
 ALTER TABLE public.coupons ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all operations on coupons" ON public.coupons;
 CREATE POLICY "Allow all operations on coupons"
 ON public.coupons FOR ALL
 USING (true)
@@ -129,6 +132,7 @@ CREATE TABLE IF NOT EXISTS public.vips (
 
 ALTER TABLE public.vips ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all operations on vips" ON public.vips;
 CREATE POLICY "Allow all operations on vips"
 ON public.vips FOR ALL
 USING (true)
@@ -148,6 +152,7 @@ CREATE TABLE IF NOT EXISTS public.reviews (
 
 ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all operations on reviews" ON public.reviews;
 CREATE POLICY "Allow all operations on reviews"
 ON public.reviews FOR ALL
 USING (true)
@@ -168,9 +173,8 @@ CREATE TABLE IF NOT EXISTS public.customers (
 
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Allow all operations on customers" ON public.customers;
 CREATE POLICY "Allow all operations on customers"
 ON public.customers FOR ALL
 USING (true)
 WITH CHECK (true);
-
-
