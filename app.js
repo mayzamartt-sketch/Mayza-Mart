@@ -747,39 +747,13 @@ class MayzaEntranceApp {
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Refresh live announcement banner and active coupons from Supabase
+    // Refresh live announcement banner, active coupons, and product matrix from Supabase
     this.syncLiveBannersAndCoupons();
+    this.syncLiveProducts();
   }
 
   initStorefrontInteractions() {
-    // Interactive Add to Cart buttons with Customer Auth Gatekeeper
-    document.querySelectorAll('.add-to-cart-action-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const card = btn.closest('.product-item-card');
-        const name = card ? card.getAttribute('data-name') : 'Item';
-
-        // Gatekeeper check: User must be signed in to add items to cart!
-        const currentCustomer = window.mayzaSupabase?.getCurrentCustomer();
-        if (!currentCustomer) {
-          this.pendingCartAction = { name };
-          this.openCustomerAuthModal("Please sign in or create an account to add items to your cart! 🛍️");
-          return;
-        }
-
-        this.addToCart(name);
-      });
-    });
-
-    // Wishlist Favorite Heart toggle
-    document.querySelectorAll('.favorite-heart-btn').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        btn.classList.toggle('active');
-        this.sound.playBubblePop(780);
-        this.showToast(btn.classList.contains('active') ? 'Saved to Wishlist! 💖' : 'Removed from Wishlist');
-      });
-    });
+    this.bindProductCardEvents();
 
     // Live Search Filter for Bestsellers
     const searchInput = document.getElementById('storeSearchInput');
@@ -803,8 +777,161 @@ class MayzaEntranceApp {
     // Initialize Customer Authentication & Dashboard Gateway
     this.initCustomerAuthAndDashboard();
 
-    // Sync live announcement banner and coupons from Supabase & Admin in real time
+    // Sync live announcement banner, coupons, and products from Supabase & Admin in real time
     this.syncLiveBannersAndCoupons();
+    this.syncLiveProducts();
+  }
+
+  // =========================================================
+  // LIVE STORE PRODUCTS REAL-TIME SYNC
+  // =========================================================
+  async syncLiveProducts() {
+    const grid = document.getElementById('bestsellersProductsGrid') || document.querySelector('.bestsellers-products-grid');
+    if (!grid) return;
+
+    if (!this.defaultProductsHtml) {
+      this.defaultProductsHtml = grid.innerHTML;
+    }
+
+    const defaultCatalog = [
+      { id: 'def-1', title: 'Cute Hair Clips Set (Pack of 12)', price: 249, rating: '4.8', tag: 'Best Seller', image: 'assets/p-clips.jpg' },
+      { id: 'def-2', title: 'Unicorn Return Gift Box (Set of 5)', price: 299, rating: '4.7', tag: 'Best Seller', image: 'assets/p-giftbox.jpg' },
+      { id: 'def-3', title: 'Mini Handbag (Kids & Teens)', price: 349, rating: '4.6', tag: 'New', image: 'assets/p-handbag.jpg' },
+      { id: 'def-4', title: 'Scented Candle Gift Set', price: 499, rating: '4.8', tag: 'Best Seller', image: 'assets/p-candle.jpg' },
+      { id: 'def-5', title: 'Designer Scrunchies (Set of 5)', price: 199, rating: '4.7', tag: 'Best Seller', image: 'assets/p-scrunchies.jpg' },
+      { id: 'def-6', title: 'Cute Water Bottle (500ml)', price: 299, rating: '4.6', tag: 'New', image: 'assets/p-bottle.jpg' },
+      { id: 'def-7', title: 'Stationery Set (Unicorn Theme)', price: 349, rating: '4.8', tag: 'Best Seller', image: 'assets/cat-stationery.jpg' },
+      { id: 'def-8', title: 'Teddy Bear (Small)', price: 399, rating: '4.9', tag: 'Best Seller', image: 'assets/cat-toys.jpg' }
+    ];
+
+    const escapeHtml = (str) => {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    };
+
+    const renderProducts = (productsToRender) => {
+      if (!productsToRender || productsToRender.length === 0) {
+        grid.innerHTML = this.defaultProductsHtml;
+        this.bindProductCardEvents();
+        return;
+      }
+
+      grid.innerHTML = productsToRender.map(p => {
+        const tag = p.tag || 'Best Seller';
+        const isNew = tag.toLowerCase().includes('new');
+        const badgeClass = isNew ? 'prod-badge-pill badge-new' : 'prod-badge-pill';
+        const comparePriceHtml = p.comparePrice ? `<span class="prod-compare-price" style="text-decoration:line-through; font-size:0.85em; opacity:0.55; margin-left:6px; font-weight:500;">₹${p.comparePrice}</span>` : '';
+        const imgSrc = p.image || 'assets/p-clips.jpg';
+        const rating = p.rating || '4.8';
+
+        return `
+          <article class="product-item-card" data-name="${escapeHtml(p.title)}" data-id="${escapeHtml(p.id)}">
+            <div class="prod-card-media">
+              <img src="${escapeHtml(imgSrc)}" alt="${escapeHtml(p.title)}" loading="lazy" onerror="this.onerror=null; this.src='assets/p-clips.jpg';">
+              <span class="${badgeClass}">${escapeHtml(tag)}</span>
+              <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
+            </div>
+            <div class="prod-card-info">
+              <h3 class="prod-name-title">${escapeHtml(p.title)}</h3>
+              <p class="prod-price-text">₹${p.price} ${comparePriceHtml}</p>
+              <p class="prod-rating-score">★ ${rating}</p>
+              <button class="add-to-cart-action-btn" aria-label="Add to cart" data-name="${escapeHtml(p.title)}" data-price="${p.price}" data-id="${escapeHtml(p.id)}">
+                <span>🛒</span> Add to Cart
+              </button>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      this.bindProductCardEvents();
+    };
+
+    // 1. Initial cached values
+    let cachedList = null;
+    try {
+      const stored = localStorage.getItem('mm_products');
+      if (stored) cachedList = JSON.parse(stored);
+    } catch (e) {}
+
+    if (Array.isArray(cachedList) && cachedList.length > 0) {
+      const customTitles = new Set(cachedList.map(c => (c.title || '').toLowerCase().trim()));
+      const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()));
+      renderProducts([...cachedList, ...remainingDefaults]);
+    }
+
+    // 2. Fetch live from Supabase
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      try {
+        const cloudProducts = await window.mayzaSupabase.fetchProducts();
+        if (Array.isArray(cloudProducts) && cloudProducts.length > 0) {
+          localStorage.setItem('mm_products', JSON.stringify(cloudProducts));
+          const customTitles = new Set(cloudProducts.map(c => (c.title || '').toLowerCase().trim()));
+          const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()));
+          renderProducts([...cloudProducts, ...remainingDefaults]);
+        }
+      } catch (err) {
+        console.warn('[Storefront] syncLiveProducts error:', err);
+      }
+    }
+
+    // 3. Listen to real-time custom product updates and cross-tab storage
+    if (!this.hasProductListeners) {
+      this.hasProductListeners = true;
+      window.addEventListener('mayza:products-updated', (e) => {
+        if (e.detail?.products && Array.isArray(e.detail.products)) {
+          const customTitles = new Set(e.detail.products.map(c => (c.title || '').toLowerCase().trim()));
+          const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()));
+          renderProducts([...e.detail.products, ...remainingDefaults]);
+        } else {
+          this.syncLiveProducts();
+        }
+      });
+
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'mm_products' || e.key === 'mm_products_timestamp') {
+          this.syncLiveProducts();
+        }
+      });
+    }
+  }
+
+  bindProductCardEvents() {
+    // Interactive Add to Cart buttons with Customer Auth Gatekeeper
+    document.querySelectorAll('.add-to-cart-action-btn').forEach(btn => {
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+
+      newBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const card = newBtn.closest('.product-item-card');
+        const name = newBtn.getAttribute('data-name') || (card ? card.getAttribute('data-name') : 'Item');
+
+        // Gatekeeper check: User must be signed in to add items to cart!
+        const currentCustomer = window.mayzaSupabase?.getCurrentCustomer();
+        if (!currentCustomer) {
+          this.pendingCartAction = { name };
+          this.openCustomerAuthModal("Please sign in or create an account to add items to your cart! 🛍️");
+          return;
+        }
+
+        this.addToCart(name);
+      });
+    });
+
+    // Wishlist Favorite Heart toggle
+    document.querySelectorAll('.favorite-heart-btn').forEach(btn => {
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+
+      newBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        newBtn.classList.toggle('active');
+        this.sound.playBubblePop(780);
+        this.showToast(newBtn.classList.contains('active') ? 'Saved to Wishlist! 💖' : 'Removed from Wishlist');
+      });
+    });
   }
 
   // =========================================================

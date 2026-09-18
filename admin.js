@@ -60,11 +60,16 @@ class StudioState {
 
   save() {
     localStorage.setItem("mm_products", JSON.stringify(this.products));
+    localStorage.setItem("mm_products_timestamp", Date.now().toString());
     localStorage.setItem("mm_orders", JSON.stringify(this.orders));
     localStorage.setItem("mm_coupons", JSON.stringify(this.coupons));
     localStorage.setItem("mm_vips", JSON.stringify(this.vips));
     localStorage.setItem("mm_reviews", JSON.stringify(this.reviews));
     localStorage.setItem("mm_wholesale", JSON.stringify(this.wholesalePurchases));
+
+    window.dispatchEvent(new CustomEvent('mayza:products-updated', {
+      detail: { products: this.products }
+    }));
   }
 
   async initCloudSync() {
