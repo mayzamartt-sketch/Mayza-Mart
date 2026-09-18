@@ -334,16 +334,19 @@ class MayzaEntranceApp {
   startExperience() {
     this.sound.init();
     this.sound.playBubblePop(720);
+    this.autoTransitionToStore = true;
 
     if (this.introOverlay) {
       this.introOverlay.classList.add('dismissed');
       setTimeout(() => {
         this.introOverlay.style.display = 'none';
-      }, 300);
+      }, 350);
     }
 
-    // Enter directly into Mayza Mart Wonderland Storefront!
-    this.enterStore();
+    // Play the signature entrance animation from 0s with full sound!
+    setTimeout(() => {
+      this.mainTimeline.restart();
+    }, 200);
   }
 
   setupAnimation() {
@@ -359,19 +362,27 @@ class MayzaEntranceApp {
     gsap.set('.bubbly-letter:not(#letterM)', { scale: 0, y: 35, transformOrigin: 'center center', opacity: 0 });
     gsap.set('.mart-letter', { scale: 0, y: 25, transformOrigin: 'center bottom', opacity: 0 });
     gsap.set('#sparkleRaysGroup g', { scale: 0, transformOrigin: 'bottom center', opacity: 0 });
-    this.speechBubble.classList.remove('show');
+    if (this.speechBubble) this.speechBubble.classList.remove('show');
 
     // Build Master GSAP Timeline
     this.mainTimeline = gsap.timeline({
       paused: true,
       onStart: () => {
+        if (this.speechBubble) this.speechBubble.classList.remove('show');
         this.animStatus.innerHTML = '<span class="status-indicator"></span><span class="status-text">Playing entrance animation...</span>';
       },
       onComplete: () => {
         this.animStatus.innerHTML = '<span class="status-indicator" style="background:#10B981;"></span><span class="status-text">Your sweetest shopping spree starts now! 🛍️</span>';
-        this.speechBubble.classList.add('show');
+        if (this.speechBubble) this.speechBubble.classList.add('show');
         this.startIdleLoops();
         this.celebrateConfetti();
+
+        // Smoothly transition into the Mayza Mart Storefront after celebration!
+        if (this.autoTransitionToStore) {
+          this.autoTransitionTimer = setTimeout(() => {
+            this.enterStore();
+          }, 1800);
+        }
       }
     });
 
@@ -711,6 +722,10 @@ class MayzaEntranceApp {
 
   enterStore() {
     this.isEntered = true;
+    if (this.autoTransitionTimer) {
+      clearTimeout(this.autoTransitionTimer);
+      this.autoTransitionTimer = null;
+    }
     this.sound.playSparkleChime();
     this.celebrateConfetti();
 
@@ -1434,13 +1449,24 @@ class MayzaEntranceApp {
 
   returnToAnimation() {
     this.isEntered = false;
-    this.storefrontPreview.classList.remove('active');
-    this.stageContainer.style.display = 'flex';
+    this.autoTransitionToStore = false; // Stay on animation stage when returning
+    if (this.autoTransitionTimer) {
+      clearTimeout(this.autoTransitionTimer);
+      this.autoTransitionTimer = null;
+    }
+    if (this.storefrontPreview) {
+      this.storefrontPreview.classList.remove('active');
+    }
+    if (this.stageContainer) {
+      this.stageContainer.style.display = 'flex';
+      this.stageContainer.classList.remove('fade-out');
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     setTimeout(() => {
-      this.stageContainer.classList.remove('fade-out');
       this.replayAnimation();
-    }, 100);
+    }, 120);
   }
 }
 
