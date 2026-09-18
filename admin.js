@@ -488,6 +488,47 @@ class StudioState {
     localStorage.setItem("mm_wholesale", JSON.stringify(this.wholesalePurchases));
   }
 
+  async initCloudSync() {
+    if (!window.mayzaSupabase || !window.mayzaSupabase.isConfigured()) return false;
+    try {
+      const data = await window.mayzaSupabase.syncSupabaseToLocal();
+      if (data) {
+        let hasChanges = false;
+        if (data.products && data.products.length > 0) {
+          this.products = data.products;
+          hasChanges = true;
+        }
+        if (data.orders && data.orders.length > 0) {
+          this.orders = data.orders;
+          hasChanges = true;
+        }
+        if (data.wholesalePurchases && data.wholesalePurchases.length > 0) {
+          this.wholesalePurchases = data.wholesalePurchases;
+          hasChanges = true;
+        }
+        if (data.coupons && data.coupons.length > 0) {
+          this.coupons = data.coupons;
+          hasChanges = true;
+        }
+        if (data.vips && data.vips.length > 0) {
+          this.vips = data.vips;
+          hasChanges = true;
+        }
+        if (data.reviews && data.reviews.length > 0) {
+          this.reviews = data.reviews;
+          hasChanges = true;
+        }
+        if (hasChanges) {
+          this.save();
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn('[StudioState] initCloudSync error:', err);
+    }
+    return false;
+  }
+
   reset() {
     localStorage.clear();
     this.products = [...DEFAULT_PRODUCTS];
@@ -961,6 +1002,11 @@ function advanceOrderStatus(orderId) {
   if (next) {
     order.status = next;
     state.save();
+
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      window.mayzaSupabase.updateOrderStatus(order.id, next).catch(console.warn);
+    }
+
     showToast(`Order ${order.id} moved to status: ${next}! 🚀`);
     if (next === "Packed" || next === "Delivered") {
       triggerCelebration();
@@ -1128,6 +1174,11 @@ function adjustStock(productId, delta) {
 
   prod.stock = Math.max(0, prod.stock + delta);
   state.save();
+
+  if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+    window.mayzaSupabase.upsertProduct(prod).catch(console.warn);
+  }
+
   audio.playClick();
   renderProductMatrix();
   renderDashboardOverview();
@@ -1144,6 +1195,11 @@ function deleteProduct(productId) {
   if (confirm(`Are you sure you want to remove "${prod.title}" from Wonderland Studio?`)) {
     state.products = state.products.filter(p => p.id !== productId);
     state.save();
+
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      window.mayzaSupabase.deleteProduct(productId).catch(console.warn);
+    }
+
     showToast(`Removed "${prod.title}" from inventory.`);
     audio.playClick();
     renderProductMatrix();
@@ -1208,6 +1264,7 @@ function handleProductFormSubmit(e) {
     image = document.getElementById("prodCustomImageUrl").value.trim() || "assets/p-clips.jpg";
   }
 
+  let targetProduct = null;
   if (editId) {
     const prod = state.products.find(p => p.id === editId);
     if (prod) {
@@ -1219,6 +1276,7 @@ function handleProductFormSubmit(e) {
       prod.stock = stock;
       prod.tag = tag;
       prod.image = image;
+      targetProduct = prod;
       showToast(`Updated "${title}" successfully! ✨`);
     }
   } else {
@@ -1235,11 +1293,17 @@ function handleProductFormSubmit(e) {
       salesCount: 0
     };
     state.products.unshift(newProd);
+    targetProduct = newProd;
     showToast(`Added "${title}" to Wonderland Studio! 🌸`);
     triggerCelebration();
   }
 
   state.save();
+
+  if (targetProduct && window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+    window.mayzaSupabase.upsertProduct(targetProduct).catch(console.warn);
+  }
+
   closeProductModal();
   renderProductMatrix();
   renderDashboardOverview();
@@ -1706,6 +1770,14 @@ function handleWholesaleFormSubmit(e) {
   state.wholesalePurchases.unshift(newPurchase);
   state.save();
 
+  if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+    window.mayzaSupabase.upsertWholesale(newPurchase).catch(console.warn);
+    if (shouldSync && newPurchase.productId) {
+      const pToSync = state.products.find(p => p.id === newPurchase.productId);
+      if (pToSync) window.mayzaSupabase.upsertProduct(pToSync).catch(console.warn);
+    }
+  }
+
   triggerCelebration();
   showToast(`Wholesale purchase ${billNumber} logged successfully! (₹${(quantity * unitCost).toLocaleString("en-IN")})`);
 
@@ -1727,9 +1799,11 @@ function syncWholesaleToProducts(purchaseId) {
     existing = state.products.find(p => p.title.toLowerCase().trim() === purchase.productName.toLowerCase().trim());
   }
 
+  let prodToSync = null;
   if (existing) {
     existing.stock += purchase.quantity;
     existing.price = purchase.sellingPrice;
+    prodToSync = existing;
   } else {
     const newProd = {
       id: `prod-${Date.now()}`,
@@ -1745,10 +1819,16 @@ function syncWholesaleToProducts(purchaseId) {
     };
     state.products.unshift(newProd);
     purchase.productId = newProd.id;
+    prodToSync = newProd;
   }
 
   purchase.synced = true;
   state.save();
+
+  if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+    window.mayzaSupabase.upsertWholesale(purchase).catch(console.warn);
+    if (prodToSync) window.mayzaSupabase.upsertProduct(prodToSync).catch(console.warn);
+  }
 
   audio.playSuccess();
   showToast(`Synced ${purchase.quantity} units of "${purchase.productName}" into Product Matrix! 📦`);
@@ -1764,6 +1844,11 @@ function deleteWholesalePurchase(purchaseId) {
   if (confirm(`Are you sure you want to delete wholesale bill "${purchase.billNumber}" from ${purchase.supplier}?`)) {
     state.wholesalePurchases = state.wholesalePurchases.filter(p => p.id !== purchaseId);
     state.save();
+
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      window.mayzaSupabase.deleteWholesale(purchaseId).catch(console.warn);
+    }
+
     audio.playClick();
     showToast(`Deleted wholesale purchase ${purchase.billNumber}.`);
     renderWholesalePurchases();
@@ -2239,6 +2324,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initial render of wholesale count badge & data
   renderWholesalePurchases();
 
+  // Initialize Supabase Cloud Manager
+  initSupabaseManager();
+
   // Reset to default demo data
   document.getElementById("resetDataBtn")?.addEventListener("click", () => {
     if (confirm("Are you sure you want to reset all data back to factory demo defaults?")) {
@@ -2252,3 +2340,213 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+
+// =========================================================
+// 15. SUPABASE CLOUD CONNECTION MANAGER
+// =========================================================
+function initSupabaseManager() {
+  const pillBtn = document.getElementById("supabasePillBtn");
+  const pillText = document.getElementById("supabasePillText");
+  const modal = document.getElementById("supabaseModal");
+  const closeBtn = document.getElementById("closeSupabaseModalBtn");
+  const form = document.getElementById("supabaseConfigForm");
+  const urlInput = document.getElementById("supabaseUrlInput");
+  const keyInput = document.getElementById("supabaseKeyInput");
+  const testBtn = document.getElementById("testSupabaseBtn");
+  const disconnectBtn = document.getElementById("disconnectSupabaseBtn");
+  const pushBtn = document.getElementById("pushToSupabaseBtn");
+  const pullBtn = document.getElementById("pullFromSupabaseBtn");
+  const statusBanner = document.getElementById("supabaseStatusBanner");
+  const bannerIcon = document.getElementById("supabaseBannerIcon");
+  const bannerTitle = document.getElementById("supabaseBannerTitle");
+  const bannerDetail = document.getElementById("supabaseBannerDetail");
+
+  function updateStatusUI(connected, message) {
+    if (!pillBtn || !pillText) return;
+    if (connected) {
+      pillBtn.className = "supabase-cloud-pill connected";
+      pillText.textContent = "Supabase: Cloud Active";
+      pillBtn.title = "Supabase PostgreSQL is connected & synced";
+      if (statusBanner) {
+        statusBanner.className = "supabase-status-banner connected";
+        if (bannerIcon) bannerIcon.textContent = "🟢";
+        if (bannerTitle) bannerTitle.textContent = "Connected to Supabase Cloud";
+        if (bannerDetail) bannerDetail.textContent = message || `Project: ${window.mayzaSupabase?.url || ""}`;
+      }
+    } else {
+      pillBtn.className = "supabase-cloud-pill disconnected";
+      pillText.textContent = "Supabase: Offline";
+      pillBtn.title = "Click to configure Supabase Cloud Database";
+      if (statusBanner) {
+        statusBanner.className = "supabase-status-banner";
+        if (bannerIcon) bannerIcon.textContent = "🟡";
+        if (bannerTitle) bannerTitle.textContent = "Local Cache Mode";
+        if (bannerDetail) bannerDetail.textContent = message || "Running locally with browser storage. Enter credentials to connect.";
+      }
+    }
+  }
+
+  // Listen to custom events from supabaseClient.js
+  window.addEventListener("mayza:supabase-status", (e) => {
+    updateStatusUI(e.detail.connected, e.detail.message);
+  });
+
+  // Pre-fill inputs if credentials exist
+  if (window.mayzaSupabase) {
+    if (urlInput) urlInput.value = window.mayzaSupabase.url || "https://twvxffxtotizfbsxvgjb.supabase.co";
+    if (keyInput) keyInput.value = window.mayzaSupabase.key || "";
+    updateStatusUI(window.mayzaSupabase.isConfigured(), window.mayzaSupabase.isConfigured() ? "Cloud database connected" : "");
+  }
+
+  // Open modal
+  pillBtn?.addEventListener("click", () => {
+    modal?.classList.add("active");
+    audio?.playClick();
+  });
+
+  // Close modal
+  closeBtn?.addEventListener("click", () => {
+    modal?.classList.remove("active");
+  });
+
+  // Test Connection
+  testBtn?.addEventListener("click", async () => {
+    if (!window.mayzaSupabase) return;
+    const url = urlInput?.value.trim();
+    const key = keyInput?.value.trim();
+    if (!url || !key) {
+      showToast("Please enter both Project URL and Anon Key first.", "warning");
+      return;
+    }
+
+    testBtn.disabled = true;
+    testBtn.innerHTML = "<span>⏳ Testing Connection...</span>";
+    
+    window.mayzaSupabase.setCredentials(url, key);
+    const res = await window.mayzaSupabase.testConnection();
+    
+    testBtn.disabled = false;
+    testBtn.innerHTML = "<span>🔍 Test Connection</span>";
+
+    if (res.success) {
+      showToast("Supabase Connection Successful! ⚡ Database online.");
+      triggerCelebration();
+      updateStatusUI(true, res.message);
+    } else {
+      showToast(res.message, "warning");
+      updateStatusUI(false, res.message);
+    }
+  });
+
+  // Save Credentials Form
+  form?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!window.mayzaSupabase) return;
+    const url = urlInput.value.trim();
+    const key = keyInput.value.trim();
+
+    window.mayzaSupabase.setCredentials(url, key);
+    showToast("Supabase credentials saved! Testing database link...");
+
+    const res = await window.mayzaSupabase.testConnection();
+    if (res.success) {
+      showToast("Supabase Cloud Connected! Loading latest cloud data...");
+      triggerCelebration();
+      updateStatusUI(true, "Cloud Database Connected");
+      // Pull and refresh
+      const pulled = await state.initCloudSync();
+      if (pulled) {
+        renderDashboardOverview();
+        renderOrdersTable();
+        renderProductMatrix();
+        renderCoupons();
+        renderWholesalePurchases();
+        showToast("Synced with cloud catalog! 🌸");
+      }
+      modal?.classList.remove("active");
+    } else {
+      showToast(`Credentials saved, but connection failed: ${res.message}`, "warning");
+    }
+  });
+
+  // Disconnect
+  disconnectBtn?.addEventListener("click", () => {
+    if (!window.mayzaSupabase) return;
+    if (confirm("Disconnect Supabase cloud? Your app will switch back to local browser storage.")) {
+      window.mayzaSupabase.clearCredentials();
+      if (urlInput) urlInput.value = "https://twvxffxtotizfbsxvgjb.supabase.co";
+      if (keyInput) keyInput.value = "";
+      showToast("Supabase disconnected. Operating in local mode.");
+      updateStatusUI(false, "Disconnected from cloud.");
+      modal?.classList.remove("active");
+    }
+  });
+
+  // Push Local Data to Supabase
+  pushBtn?.addEventListener("click", async () => {
+    if (!window.mayzaSupabase || !window.mayzaSupabase.isConfigured()) {
+      showToast("Please save and connect your Supabase credentials first.", "warning");
+      return;
+    }
+
+    pushBtn.disabled = true;
+    pushBtn.innerHTML = "<span>⏳ Uploading Catalog...</span>";
+
+    try {
+      const res = await window.mayzaSupabase.syncLocalToSupabase(state);
+      showToast(`Cloud Sync Complete! Uploaded ${res.products} products, ${res.orders} orders, ${res.wholesale} wholesale bills! 🚀`);
+      triggerCelebration();
+      audio?.playSuccess();
+    } catch (err) {
+      showToast(`Sync error: ${err.message}`, "warning");
+    } finally {
+      pushBtn.disabled = false;
+      pushBtn.innerHTML = "<span>⬆️ Push Local Data to Supabase</span>";
+    }
+  });
+
+  // Pull Cloud Data to Local
+  pullBtn?.addEventListener("click", async () => {
+    if (!window.mayzaSupabase || !window.mayzaSupabase.isConfigured()) {
+      showToast("Please save and connect your Supabase credentials first.", "warning");
+      return;
+    }
+
+    pullBtn.disabled = true;
+    pullBtn.innerHTML = "<span>⏳ Fetching Cloud Data...</span>";
+
+    try {
+      const pulled = await state.initCloudSync();
+      if (pulled) {
+        renderDashboardOverview();
+        renderOrdersTable();
+        renderProductMatrix();
+        renderCoupons();
+        renderWholesalePurchases();
+        showToast("Successfully synced all catalog and orders from Supabase! 🌸");
+        triggerCelebration();
+        audio?.playSuccess();
+      } else {
+        showToast("Cloud sync check completed. Local catalog is already up-to-date!");
+      }
+    } catch (err) {
+      showToast(`Pull error: ${err.message}`, "warning");
+    } finally {
+      pullBtn.disabled = false;
+      pullBtn.innerHTML = "<span>⬇️ Pull Cloud Data to Local</span>";
+    }
+  });
+
+  // Initial cloud sync if configured
+  if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+    state.initCloudSync().then((hasChanges) => {
+      if (hasChanges) {
+        renderDashboardOverview();
+        renderOrdersTable();
+        renderProductMatrix();
+        renderCoupons();
+        renderWholesalePurchases();
+      }
+    }).catch(console.warn);
+  }
+}

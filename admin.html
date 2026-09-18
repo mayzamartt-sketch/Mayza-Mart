@@ -15,6 +15,10 @@
   
   <!-- Canvas Confetti for milestone & order fulfillment celebrations -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <!-- Supabase JS Client & Cloud Bridge -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabaseClient.js"></script>
 </head>
 <body class="studio-theme">
 
@@ -65,6 +69,13 @@
 
       <!-- Right Header Actions -->
       <div class="header-right">
+        <!-- Supabase Cloud Connection Status Pill -->
+        <button class="supabase-cloud-pill disconnected" id="supabasePillBtn" title="Supabase Cloud Database Settings" aria-label="Supabase Cloud Settings">
+          <span class="supabase-indicator"></span>
+          <span class="supabase-pill-logo">⚡</span>
+          <span class="supabase-pill-text" id="supabasePillText">Supabase: Offline</span>
+        </button>
+
         <!-- Live Store Status -->
         <a href="/" target="_blank" class="live-store-pill" title="Open Customer Storefront">
           <span class="pulse-indicator"></span>
@@ -1307,6 +1318,79 @@
       <!-- Printable Sheet -->
       <div class="invoice-printable-sheet" id="wholesalePrintArea">
         <!-- Populated dynamically by admin.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- MODAL 6: SUPABASE CLOUD CONNECTION SETTINGS  -->
+  <!-- ============================================ -->
+  <div class="studio-modal-overlay" id="supabaseModal" aria-hidden="true">
+    <div class="studio-modal glass-card" style="max-width: 640px;">
+      <div class="modal-header">
+        <div class="modal-title-lockup">
+          <span class="modal-badge-sparkle">⚡</span>
+          <h3 class="modal-title">Supabase Database Connection</h3>
+        </div>
+        <button class="modal-close-btn" id="closeSupabaseModalBtn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-desc-sub" style="margin-bottom: 1rem; line-height: 1.5; font-size: 0.88rem; opacity: 0.85;">
+          Connect your Mayza Mart store and Wonderland Studio to your Supabase PostgreSQL cloud database for real-time order tracking, inventory sync, and multi-device management.
+        </p>
+        
+        <div class="supabase-status-banner" id="supabaseStatusBanner">
+          <div class="status-icon-bubble" id="supabaseBannerIcon">🟡</div>
+          <div class="status-banner-text">
+            <strong id="supabaseBannerTitle">Local Cache Mode</strong>
+            <span id="supabaseBannerDetail">Using browser storage. Enter your Supabase credentials below to connect cloud sync.</span>
+          </div>
+        </div>
+
+        <form id="supabaseConfigForm" class="studio-form-grid" style="margin-top: 1.25rem;">
+          <div class="form-group full-width">
+            <label for="supabaseUrlInput">Project URL (HTTPS)</label>
+            <input type="url" id="supabaseUrlInput" placeholder="https://xyzcompany.supabase.co" class="studio-input" required>
+            <span class="input-helper">Find this under Supabase Project Settings → API → Project URL</span>
+          </div>
+
+          <div class="form-group full-width">
+            <label for="supabaseKeyInput">Anon / Public API Key</label>
+            <input type="password" id="supabaseKeyInput" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." class="studio-input" required>
+            <span class="input-helper">Find this under Supabase Project Settings → API → Project API Keys (anon public)</span>
+          </div>
+
+          <div class="form-actions-split full-width" style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem;">
+            <button type="button" class="action-btn secondary-btn" id="testSupabaseBtn">
+              <span>🔍 Test Connection</span>
+            </button>
+            <button type="submit" class="action-btn primary-glow-btn" id="saveSupabaseBtn">
+              <span>💾 Save Credentials</span>
+            </button>
+            <button type="button" class="action-btn ghost-btn text-danger" id="disconnectSupabaseBtn">
+              <span>Disconnect</span>
+            </button>
+          </div>
+        </form>
+
+        <div class="supabase-sync-tools-card">
+          <h4>🚀 Cloud Data Sync & Migration</h4>
+          <p>Upload all your existing catalog products, wholesale orders, and store settings directly to Supabase with one click.</p>
+          
+          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <button type="button" class="action-btn secondary-btn" id="pushToSupabaseBtn">
+              <span>⬆️ Push Local Data to Supabase</span>
+            </button>
+            <button type="button" class="action-btn secondary-btn" id="pullFromSupabaseBtn">
+              <span>⬇️ Pull Cloud Data to Local</span>
+            </button>
+          </div>
+
+          <div class="schema-tip-box">
+            💡 <strong>Setup Step:</strong> Open <code>supabase_schema.sql</code> in your project, copy its content, and run it once in your <strong>Supabase SQL Editor</strong> to initialize all tables!
+          </div>
+        </div>
       </div>
     </div>
   </div>
