@@ -6,458 +6,37 @@
  */
 
 // =========================================================
-// 1. DEFAULT SEED DATA (Mayza Mart Catalog & Operations)
+// 1. DEFAULT SEED DATA (Clean Empty State for Production)
 // =========================================================
-const DEFAULT_PRODUCTS = [
-  {
-    id: "prod-1",
-    title: "Cute Hair Clips Set (Pack of 12)",
-    category: "Hair Accessories",
-    sku: "MM-HAIR-01",
-    price: 249,
-    comparePrice: 399,
-    stock: 42,
-    tag: "Best Seller",
-    image: "assets/p-clips.jpg",
-    salesCount: 184
-  },
-  {
-    id: "prod-2",
-    title: "Unicorn Return Gift Box (Set of 5)",
-    category: "Return Gifts",
-    sku: "MM-GIFT-02",
-    price: 299,
-    comparePrice: 499,
-    stock: 18,
-    tag: "Best Seller",
-    image: "assets/p-giftbox.jpg",
-    salesCount: 142
-  },
-  {
-    id: "prod-3",
-    title: "Pastel Crossbody Handbag & Sling",
-    category: "Handbags & Purses",
-    sku: "MM-BAG-03",
-    price: 499,
-    comparePrice: 799,
-    stock: 7, // Low stock trigger
-    tag: "Cousin's Pick",
-    image: "assets/p-handbag.jpg",
-    salesCount: 96
-  },
-  {
-    id: "prod-4",
-    title: "Kawaii Sipper Water Bottle (600ml)",
-    category: "Home & Lifestyle",
-    sku: "MM-HOME-04",
-    price: 349,
-    comparePrice: 549,
-    stock: 24,
-    tag: "Trending",
-    image: "assets/p-bottle.jpg",
-    salesCount: 88
-  },
-  {
-    id: "prod-5",
-    title: "Lavender & Vanilla Scented Jar Candle",
-    category: "Home & Lifestyle",
-    sku: "MM-HOME-05",
-    price: 199,
-    comparePrice: 299,
-    stock: 31,
-    tag: "New Arrival",
-    image: "assets/p-candle.jpg",
-    salesCount: 75
-  },
-  {
-    id: "prod-6",
-    title: "Satin Silk Scrunchies Cloud Pack (Set of 6)",
-    category: "Hair Accessories",
-    sku: "MM-HAIR-06",
-    price: 149,
-    comparePrice: 249,
-    stock: 65,
-    tag: "Best Seller",
-    image: "assets/p-scrunchies.jpg",
-    salesCount: 220
-  },
-  {
-    id: "prod-7",
-    title: "Pastel Dream Journal & Calligraphy Pen Kit",
-    category: "Stationery",
-    sku: "MM-STAT-07",
-    price: 279,
-    comparePrice: 399,
-    stock: 14,
-    tag: "Cousin's Pick",
-    image: "assets/cat-stationery.jpg",
-    salesCount: 64
-  },
-  {
-    id: "prod-8",
-    title: "Fluffy Bunny Plush Toy & Keychain",
-    category: "Toys",
-    sku: "MM-TOY-08",
-    price: 189,
-    comparePrice: 299,
-    stock: 5, // Low stock trigger
-    tag: "Trending",
-    image: "assets/cat-toys.jpg",
-    salesCount: 110
-  },
-  {
-    id: "prod-9",
-    title: "Dainty Butterfly Charm Pearl Bracelet",
-    category: "Jewellery & Fashion",
-    sku: "MM-JEW-09",
-    price: 229,
-    comparePrice: 350,
-    stock: 28,
-    tag: "New Arrival",
-    image: "assets/cat-jewellery.jpg",
-    salesCount: 52
-  }
-];
+const DEFAULT_PRODUCTS = [];
 
-const DEFAULT_ORDERS = [
-  {
-    id: "MM-8841",
-    customer: {
-      name: "Ananya Sharma",
-      phone: "+91 98201 44521",
-      city: "Mumbai, MH",
-      address: "Flat 402, Lotus Blossom Heights, Bandra West, Mumbai - 400050"
-    },
-    items: [
-      { name: "Cute Hair Clips Set (Pack of 12)", sku: "MM-HAIR-01", qty: 1, price: 249 },
-      { name: "Satin Silk Scrunchies Cloud Pack", sku: "MM-HAIR-06", qty: 2, price: 149 }
-    ],
-    subtotal: 547,
-    shipping: 0,
-    total: 547,
-    payment: "UPI • GPay",
-    status: "New",
-    timestamp: "12 mins ago",
-    rawDate: "17 Sep 2026, 06:15 PM"
-  },
-  {
-    id: "MM-8840",
-    customer: {
-      name: "Priya Mehta",
-      phone: "+91 99800 12345",
-      city: "Bengaluru, KA",
-      address: "14/B, Ferns Habitat, Indiranagar, Bengaluru - 560038"
-    },
-    items: [
-      { name: "Unicorn Return Gift Box (Set of 5)", sku: "MM-GIFT-02", qty: 2, price: 299 }
-    ],
-    subtotal: 598,
-    shipping: 0,
-    total: 598,
-    payment: "UPI • PhonePe",
-    status: "New",
-    timestamp: "24 mins ago",
-    rawDate: "17 Sep 2026, 06:03 PM"
-  },
-  {
-    id: "MM-8839",
-    customer: {
-      name: "Sneha Kulkarni",
-      phone: "+91 97654 88910",
-      city: "Pune, MH",
-      address: "B-201, Marvel Imperial, Koregaon Park, Pune - 411001"
-    },
-    items: [
-      { name: "Pastel Crossbody Handbag & Sling", sku: "MM-BAG-03", qty: 1, price: 499 },
-      { name: "Lavender & Vanilla Scented Jar Candle", sku: "MM-HOME-05", qty: 1, price: 199 }
-    ],
-    subtotal: 698,
-    shipping: 0,
-    total: 698,
-    payment: "HDFC Credit Card",
-    status: "Packed",
-    timestamp: "1 hr ago",
-    rawDate: "17 Sep 2026, 05:18 PM"
-  },
-  {
-    id: "MM-8838",
-    customer: {
-      name: "Ritu Verma",
-      phone: "+91 98112 34567",
-      city: "New Delhi, DL",
-      address: "C-45, Greater Kailash 1, New Delhi - 110048"
-    },
-    items: [
-      { name: "Kawaii Sipper Water Bottle (600ml)", sku: "MM-HOME-04", qty: 1, price: 349 },
-      { name: "Pastel Dream Journal & Calligraphy Pen Kit", sku: "MM-STAT-07", qty: 1, price: 279 }
-    ],
-    subtotal: 628,
-    shipping: 0,
-    total: 628,
-    payment: "Paytm UPI",
-    status: "Packed",
-    timestamp: "2 hrs ago",
-    rawDate: "17 Sep 2026, 04:30 PM"
-  },
-  {
-    id: "MM-8837",
-    customer: {
-      name: "Aarav Sen",
-      phone: "+91 98302 99120",
-      city: "Kolkata, WB",
-      address: "88, Southern Avenue, Lake Market, Kolkata - 700029"
-    },
-    items: [
-      { name: "Unicorn Return Gift Box (Set of 5)", sku: "MM-GIFT-02", qty: 3, price: 299 }
-    ],
-    subtotal: 897,
-    shipping: 0,
-    total: 897,
-    payment: "Cash on Delivery",
-    status: "Dispatched",
-    timestamp: "3 hrs ago",
-    rawDate: "17 Sep 2026, 03:20 PM"
-  },
-  {
-    id: "MM-8836",
-    customer: {
-      name: "Tanvi Patel",
-      phone: "+91 97240 55431",
-      city: "Ahmedabad, GJ",
-      address: "302, Shivalik Highstreet, Bodakdev, Ahmedabad - 380054"
-    },
-    items: [
-      { name: "Dainty Butterfly Charm Pearl Bracelet", sku: "MM-JEW-09", qty: 1, price: 229 },
-      { name: "Satin Silk Scrunchies Cloud Pack", sku: "MM-HAIR-06", qty: 1, price: 149 }
-    ],
-    subtotal: 378,
-    shipping: 49,
-    total: 427,
-    payment: "UPI • GPay",
-    status: "Dispatched",
-    timestamp: "5 hrs ago",
-    rawDate: "17 Sep 2026, 01:10 PM"
-  },
-  {
-    id: "MM-8835",
-    customer: {
-      name: "Diya Nair",
-      phone: "+91 98470 11984",
-      city: "Kochi, KL",
-      address: "Villa 12, Skyline Riverdale, Edappally, Kochi - 682024"
-    },
-    items: [
-      { name: "Fluffy Bunny Plush Toy & Keychain", sku: "MM-TOY-08", qty: 1, price: 189 },
-      { name: "Cute Hair Clips Set (Pack of 12)", sku: "MM-HAIR-01", qty: 1, price: 249 }
-    ],
-    subtotal: 438,
-    shipping: 49,
-    total: 487,
-    payment: "UPI • PhonePe",
-    status: "Delivered",
-    timestamp: "Yesterday",
-    rawDate: "16 Sep 2026, 04:45 PM"
-  },
-  {
-    id: "MM-8834",
-    customer: {
-      name: "Meera Chawla",
-      phone: "+91 98711 77652",
-      city: "Chandigarh, CH",
-      address: "House 1024, Sector 18-C, Chandigarh - 160018"
-    },
-    items: [
-      { name: "Pastel Crossbody Handbag & Sling", sku: "MM-BAG-03", qty: 1, price: 499 }
-    ],
-    subtotal: 499,
-    shipping: 0,
-    total: 499,
-    payment: "ICICI Netbanking",
-    status: "Delivered",
-    timestamp: "Yesterday",
-    rawDate: "16 Sep 2026, 02:15 PM"
-  }
-];
+const DEFAULT_ORDERS = [];
 
-const DEFAULT_COUPONS = [
-  {
-    code: "WONDERLAND20",
-    discount: 20,
-    minSpend: 499,
-    desc: "20% off wonderland celebration on all orders above ₹499",
-    active: true,
-    uses: 142
-  },
-  {
-    code: "COUSINS15",
-    discount: 15,
-    minSpend: 299,
-    desc: "15% off by Mauji, Aynul & Faiza for first-time shoppers",
-    active: true,
-    uses: 289
-  },
-  {
-    code: "FREESHIP",
-    discount: 100,
-    minSpend: 349,
-    desc: "Free express delivery across India",
-    active: true,
-    uses: 95
-  },
-  {
-    code: "SPARKLE100",
-    discount: 25,
-    minSpend: 799,
-    desc: "Flat ₹100 / 25% festive gift discount",
-    active: true,
-    uses: 61
-  }
-];
+const DEFAULT_COUPONS = [];
 
-const DEFAULT_VIPS = [
-  { name: "Ananya Sharma", city: "Mumbai", orders: 9, spend: 4820, badge: "Wonderland Star" },
-  { name: "Sneha Kulkarni", city: "Pune", orders: 7, spend: 3940, badge: "Joy Curator" },
-  { name: "Priya Mehta", city: "Bengaluru", orders: 6, spend: 3450, badge: "Mayza VIP" },
-  { name: "Kavita Joshi", city: "Jaipur", orders: 5, spend: 2890, badge: "Mayza VIP" }
-];
+const DEFAULT_VIPS = [];
 
-const DEFAULT_REVIEWS = [
-  {
-    author: "Ananya S. • Mumbai",
-    rating: 5,
-    quote: "The packaging felt like opening a luxury surprise from the cousins! My scrunchies and hair clips are so gentle.",
-    product: "Satin Silk Scrunchies & Hair Clips"
-  },
-  {
-    author: "Sneha K. • Pune",
-    rating: 5,
-    quote: "Super fast shipping by Aynul and the team! The sling bag is my new everyday go-to.",
-    product: "Pastel Crossbody Handbag"
-  },
-  {
-    author: "Ritu V. • New Delhi",
-    rating: 5,
-    quote: "Bought unicorn return gifts for my daughter's birthday. All 20 kids were ecstatic! Truly magical.",
-    product: "Unicorn Return Gift Box"
-  }
-];
+const DEFAULT_REVIEWS = [];
 
-const DEFAULT_WHOLESALE_PURCHASES = [
-  {
-    id: "ws-1",
-    billNumber: "INV-WS-801",
-    date: "2026-09-14",
-    supplier: "Surat Textile & Accessory Hub",
-    location: "Surat, Gujarat",
-    productId: "prod-6",
-    productName: "Satin Silk Scrunchies Cloud Pack (Set of 6)",
-    category: "Hair Accessories",
-    quantity: 200,
-    unitCost: 42,
-    sellingPrice: 149,
-    totalCost: 8400,
-    paymentStatus: "Paid",
-    paymentMode: "Bank NEFT / RTGS",
-    notes: "Direct factory lot #14. High sheen mulberry satin fabric.",
-    synced: true
-  },
-  {
-    id: "ws-2",
-    billNumber: "INV-WS-802",
-    date: "2026-09-15",
-    supplier: "Sadar Bazaar Wholesalers",
-    location: "Old Delhi, DL",
-    productId: "prod-1",
-    productName: "Cute Hair Clips Set (Pack of 12)",
-    category: "Hair Accessories",
-    quantity: 150,
-    unitCost: 65,
-    sellingPrice: 249,
-    totalCost: 9750,
-    paymentStatus: "Paid",
-    paymentMode: "UPI / GPay",
-    notes: "Box packaging with acrylic pastel gloss clips.",
-    synced: true
-  },
-  {
-    id: "ws-3",
-    billNumber: "INV-WS-803",
-    date: "2026-09-16",
-    supplier: "Jaipur Artisans Leather & Handbag Emporium",
-    location: "Jaipur, RJ",
-    productId: "prod-3",
-    productName: "Pastel Crossbody Handbag & Sling",
-    category: "Handbags & Purses",
-    quantity: 40,
-    unitCost: 160,
-    sellingPrice: 499,
-    totalCost: 6400,
-    paymentStatus: "Partial",
-    paymentMode: "Bank NEFT / RTGS",
-    notes: "₹3,400 advance paid, ₹3,000 balance on 30-day term.",
-    synced: true
-  },
-  {
-    id: "ws-4",
-    billNumber: "INV-WS-804",
-    date: "2026-09-16",
-    supplier: "Metro Return Gifts & Toy Depot",
-    location: "Mumbai, MH",
-    productId: "prod-2",
-    productName: "Unicorn Return Gift Box (Set of 5)",
-    category: "Return Gifts",
-    quantity: 80,
-    unitCost: 95,
-    sellingPrice: 299,
-    totalCost: 7600,
-    paymentStatus: "Paid",
-    paymentMode: "UPI / GPay",
-    notes: "Party pack bulk discount 8% included in invoice.",
-    synced: true
-  },
-  {
-    id: "ws-5",
-    billNumber: "INV-WS-805",
-    date: "2026-09-17",
-    supplier: "Global Kawaii Stationery Imports",
-    location: "Kolkata Port, WB",
-    productId: "prod-7",
-    productName: "Pastel Dream Journal & Calligraphy Pen Kit",
-    category: "Stationery",
-    quantity: 60,
-    unitCost: 85,
-    sellingPrice: 279,
-    totalCost: 5100,
-    paymentStatus: "Credit",
-    paymentMode: "30-Day Credit",
-    notes: "Invoice due on 17 October 2026.",
-    synced: true
-  },
-  {
-    id: "ws-6",
-    billNumber: "INV-WS-806",
-    date: "2026-09-18",
-    supplier: "Aroma Bliss Home Crafts",
-    location: "Bengaluru, KA",
-    productId: "prod-5",
-    productName: "Lavender & Vanilla Scented Jar Candle",
-    category: "Home & Lifestyle",
-    quantity: 100,
-    unitCost: 60,
-    sellingPrice: 199,
-    totalCost: 6000,
-    paymentStatus: "Paid",
-    paymentMode: "UPI / GPay",
-    notes: "Soy wax natural essential oils, frosted glass containers.",
-    synced: true
-  }
-];
+const DEFAULT_WHOLESALE_PURCHASES = [];
 
 // =========================================================
 // 2. STATE MANAGER & PERSISTENCE
 // =========================================================
 class StudioState {
   constructor() {
+    // Purge old demo mock data if previously stored
+    const isMockCleaned = localStorage.getItem("mm_demo_purged_v2");
+    if (!isMockCleaned) {
+      localStorage.removeItem("mm_products");
+      localStorage.removeItem("mm_orders");
+      localStorage.removeItem("mm_coupons");
+      localStorage.removeItem("mm_vips");
+      localStorage.removeItem("mm_reviews");
+      localStorage.removeItem("mm_wholesale");
+      localStorage.setItem("mm_demo_purged_v2", "true");
+    }
+
     this.products = this.load("mm_products", DEFAULT_PRODUCTS);
     this.orders = this.load("mm_orders", DEFAULT_ORDERS);
     this.coupons = this.load("mm_coupons", DEFAULT_COUPONS);
@@ -493,35 +72,14 @@ class StudioState {
     try {
       const data = await window.mayzaSupabase.syncSupabaseToLocal();
       if (data) {
-        let hasChanges = false;
-        if (data.products && data.products.length > 0) {
-          this.products = data.products;
-          hasChanges = true;
-        }
-        if (data.orders && data.orders.length > 0) {
-          this.orders = data.orders;
-          hasChanges = true;
-        }
-        if (data.wholesalePurchases && data.wholesalePurchases.length > 0) {
-          this.wholesalePurchases = data.wholesalePurchases;
-          hasChanges = true;
-        }
-        if (data.coupons && data.coupons.length > 0) {
-          this.coupons = data.coupons;
-          hasChanges = true;
-        }
-        if (data.vips && data.vips.length > 0) {
-          this.vips = data.vips;
-          hasChanges = true;
-        }
-        if (data.reviews && data.reviews.length > 0) {
-          this.reviews = data.reviews;
-          hasChanges = true;
-        }
-        if (hasChanges) {
-          this.save();
-          return true;
-        }
+        if (Array.isArray(data.products)) this.products = data.products;
+        if (Array.isArray(data.orders)) this.orders = data.orders;
+        if (Array.isArray(data.wholesalePurchases)) this.wholesalePurchases = data.wholesalePurchases;
+        if (Array.isArray(data.coupons)) this.coupons = data.coupons;
+        if (Array.isArray(data.vips)) this.vips = data.vips;
+        if (Array.isArray(data.reviews)) this.reviews = data.reviews;
+        this.save();
+        return true;
       }
     } catch (err) {
       console.warn('[StudioState] initCloudSync error:', err);
@@ -923,8 +481,10 @@ function renderOrdersTable() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">
-          No orders found matching the criteria.
+        <td colspan="8" style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
+          <div style="font-size: 2.4rem; margin-bottom: 8px;">📦</div>
+          <strong style="font-size: 0.95rem; color: var(--text-pure); display: block; margin-bottom: 4px;">No customer orders yet</strong>
+          <span style="font-size: 0.8rem; opacity: 0.8;">Customer orders from your Mayza Mart store will appear here in real-time.</span>
         </td>
       </tr>
     `;
@@ -1082,8 +642,13 @@ function renderProductMatrix() {
 
     if (filtered.length === 0) {
       gridContainer.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 60px; color: var(--text-muted);">
-          No wonderland products found matching your search.
+        <div style="grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--text-muted);">
+          <div style="font-size: 3rem; margin-bottom: 10px;">🌸</div>
+          <h3 style="margin: 0 0 6px; color: var(--text-pure); font-weight: 800; font-size: 1.15rem;">No products in inventory yet</h3>
+          <p style="font-size: 0.85rem; margin-bottom: 20px; opacity: 0.8;">Click below or log a Wholesale Purchase to begin curating your store catalog!</p>
+          <button class="action-btn primary-glow-btn" onclick="openAddProductModal()" style="margin: 0 auto;">
+            <span>✨ Add First Product</span>
+          </button>
         </div>
       `;
       return;
@@ -1134,6 +699,17 @@ function renderProductMatrix() {
     if (tableCard) tableCard.classList.remove("hidden");
 
     if (tableBody) {
+      if (filtered.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">
+              No products in inventory yet. Click "+ Add Product" to add your first item.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
       tableBody.innerHTML = filtered.map(p => `
         <tr>
           <td>
