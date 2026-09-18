@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mayza Mart • Wonderland Studio Admin</title>
+  <meta name="description" content="Mayza Mart Wonderland Studio — Extraordinary Executive E-Commerce Admin Panel for Mauji, Aynul, and Faiza.">
+  
+  <!-- Modern Typography Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Outfit:wght@400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="admin.css">
+  
+  <!-- Canvas Confetti for milestone & order fulfillment celebrations -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+</head>
+<body class="studio-theme">
+
+  <!-- Ambient Glowing Cosmos Background -->
+  <div class="ambient-cosmos" aria-hidden="true">
+    <div class="nebula nebula-rose"></div>
+    <div class="nebula nebula-violet"></div>
+    <div class="nebula nebula-mint"></div>
+    <div class="nebula-grid-overlay"></div>
+  </div>
+
+  <!-- Main Layout Wrapper -->
+  <div class="studio-layout">
+
+    <!-- ============================================ -->
+    <!-- TOP NAVIGATION BAR                          -->
+    <!-- ============================================ -->
+    <header class="studio-header">
+      <div class="header-left">
+        <div class="brand-capsule">
+          <div class="mascot-mini-glow">
+            <img src="mascot.png" alt="Mayza Mascot" class="brand-mascot-icon">
+          </div>
+          <div class="brand-titles">
+            <div class="brand-row">
+              <span class="brand-name">Mayza Mart</span>
+              <span class="studio-badge">WONDERLAND STUDIO</span>
+            </div>
+            <span class="brand-motto">Curated with love by Mauji, Aynul &amp; Faiza</span>
+          </div>
+        </div>
+
+        <button class="mobile-nav-toggle" id="mobileNavToggle" aria-label="Toggle Navigation Menu">
+          <span class="hamburger-bar"></span>
+          <span class="hamburger-bar"></span>
+          <span class="hamburger-bar"></span>
+        </button>
+      </div>
+
+      <!-- Center Quick Search Bar -->
+      <div class="header-center">
+        <div class="search-command-bar" id="searchCommandTrigger">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="globalSearchInput" placeholder="Search orders, products, customers... (Ctrl + K)" autocomplete="off">
+          <kbd class="cmd-shortcut">⌘K</kbd>
+        </div>
+      </div>
+
+      <!-- Right Header Actions -->
+      <div class="header-right">
+        <!-- Live Store Status -->
+        <a href="/" target="_blank" class="live-store-pill" title="Open Customer Storefront">
+          <span class="pulse-indicator"></span>
+          <span class="pill-text">Live Store</span>
+          <span class="ext-icon">↗</span>
+        </a>
+
+        <!-- Sound FX Audio Toggle -->
+        <button class="studio-icon-btn" id="soundToggleBtn" title="Toggle UI Sound Effects" aria-label="Toggle Sound Effects">
+          <span class="sound-icon" id="soundIcon">🔊</span>
+        </button>
+
+        <!-- Theme Switcher (Light Wonderland / Twilight) -->
+        <button class="studio-icon-btn" id="themeToggleBtn" title="Switch Theme (Light Wonderland / Twilight)" aria-label="Toggle Theme">
+          <span id="themeIcon">🌸</span>
+        </button>
+
+        <!-- Live Digital Clock -->
+        <div class="live-clock-card">
+          <span class="clock-time" id="clockTime">12:00:00 PM</span>
+          <span class="clock-tz">IST • New Delhi</span>
+        </div>
+
+        <!-- Founders Profile Capsule -->
+        <div class="founders-profile-pill" id="foundersPill">
+          <div class="avatar-stack">
+            <span class="avatar-dot av-m" title="Mauji">M</span>
+            <span class="avatar-dot av-a" title="Aynul">A</span>
+            <span class="avatar-dot av-f" title="Faiza">F</span>
+          </div>
+          <div class="profile-meta">
+            <span class="role-label">Founders HQ</span>
+            <span class="user-status">Online ✦</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============================================ -->
+    <!-- BODY WRAPPER: SIDEBAR + MAIN CONTENT         -->
+    <!-- ============================================ -->
+    <div class="studio-body">
+
+      <!-- Glass Sidebar -->
+      <aside class="studio-sidebar" id="studioSidebar">
+        <nav class="sidebar-nav">
+          <div class="nav-section-title">COMMAND CENTER</div>
+
+          <button class="nav-item active" data-view="dashboard">
+            <span class="nav-icon">⚡</span>
+            <span class="nav-label">Command Pulse</span>
+            <span class="nav-badge pulse-badge">LIVE</span>
+          </button>
+
+          <button class="nav-item" data-view="orders">
+            <span class="nav-icon">🛍️</span>
+            <span class="nav-label">Orders &amp; Dispatch</span>
+            <span class="nav-badge order-counter" id="ordersNavCount">34</span>
+          </button>
+
+          <button class="nav-item" data-view="products">
+            <span class="nav-icon">📦</span>
+            <span class="nav-label">Product Matrix</span>
+            <span class="nav-badge" id="productsNavCount">18</span>
+          </button>
+
+          <button class="nav-item" data-view="wholesale">
+            <span class="nav-icon">🏭</span>
+            <span class="nav-label">Wholesale Purchases</span>
+            <span class="nav-badge" id="wholesaleNavCount">6</span>
+          </button>
+
+          <div class="nav-section-title">GROWTH &amp; MAGIC</div>
+
+          <button class="nav-item" data-view="marketing">
+            <span class="nav-icon">🏷️</span>
+            <span class="nav-label">Promo &amp; Coupons</span>
+          </button>
+
+          <button class="nav-item" data-view="customers">
+            <span class="nav-icon">👑</span>
+            <span class="nav-label">Wonderland VIPs</span>
+          </button>
+
+          <button class="nav-item" data-view="settings">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">Studio Settings</span>
+          </button>
+        </nav>
+
+        <!-- Cousins' Dream Metric Progress -->
+        <div class="cousins-tracker-card">
+          <div class="tracker-header">
+            <span class="tracker-star">✨</span>
+            <span class="tracker-title">Founders' Monthly Goal</span>
+          </div>
+          <div class="tracker-bar-bg">
+            <div class="tracker-bar-fill" id="goalBarFill" style="width: 82%;"></div>
+          </div>
+          <div class="tracker-footer">
+            <span class="tracker-val">₹4,92,000 / ₹6,00,000</span>
+            <span class="tracker-pct">82%</span>
+          </div>
+          <div class="cousins-mini-avatars">
+            <span class="c-tag">🍓 Mauji: Curated 24</span>
+            <span class="c-tag">📦 Aynul: 99% Shipped</span>
+            <span class="c-tag">💖 Faiza: 4.9★ CS</span>
+          </div>
+        </div>
+
+        <!-- Mascot Assistant Bubble Card -->
+        <div class="mascot-assistant-widget" id="mascotAssistant">
+          <div class="mascot-avatar-ring">
+            <img src="mascot.png" alt="Mayza Mascot" class="mascot-bubble-img">
+            <span class="sparkle-float">✦</span>
+          </div>
+          <div class="mascot-bubble-content">
+            <div class="mascot-bubble-header">
+              <span class="mascot-name">Mayza Co-pilot</span>
+              <span class="bubble-time">Just now</span>
+            </div>
+            <p class="mascot-message" id="mascotMessage">
+              "Great work! 8 new orders are waiting to be packed for evening dispatch. 💖"
+            </p>
+            <button class="mascot-action-btn" id="mascotActionBtn">Pack Orders ➔</button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Stage Viewport -->
+      <main class="studio-viewport" id="studioViewport">
+
+        <!-- ============================================ -->
+        <!-- VIEW 1: COMMAND PULSE (DASHBOARD)            -->
+        <!-- ============================================ -->
+        <section class="view-panel active" id="view-dashboard">
+          
+          <!-- View Top Header Lockup -->
+          <div class="view-headline-row">
+            <div>
+              <div class="view-eyebrow">
+                <span class="sparkle-icon">✨</span>
+                <span>REAL-TIME PERFORMANCE</span>
+              </div>
+              <h1 class="view-title">Command Pulse</h1>
+              <p class="view-subtitle">Live overview of sales, orders, and storefront traffic across Mayza Mart.</p>
+            </div>
+
+            <div class="headline-actions">
+              <button class="action-btn secondary-btn" id="refreshMetricsBtn">
+                <span class="btn-icon">↻</span>
+                <span>Refresh Pulse</span>
+              </button>
+              <button class="action-btn primary-glow-btn" id="quickNewProductBtn">
+                <span class="btn-icon">＋</span>
+                <span>Add Product</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- KPI Aurora Cards Grid -->
+          <div class="kpi-grid">
+            <!-- KPI 1: Gross Sales -->
+            <div class="kpi-card kpi-rose">
+              <div class="kpi-glow"></div>
+              <div class="kpi-header">
+                <div class="kpi-icon-box">💰</div>
+                <span class="kpi-badge positive">+18.4% ↑</span>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Today's Revenue</span>
+                <div class="kpi-value-row">
+                  <span class="kpi-currency">₹</span>
+                  <span class="kpi-value" id="kpiRevenue">48,920</span>
+                </div>
+                <span class="kpi-comparison">vs ₹41,310 yesterday</span>
+              </div>
+              <!-- Mini SVG Sparkline -->
+              <svg class="kpi-sparkline" viewBox="0 0 100 24" preserveAspectRatio="none">
+                <path d="M0,18 Q15,22 30,12 T60,14 T80,4 T100,2" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+
+            <!-- KPI 2: Total Orders -->
+            <div class="kpi-card kpi-violet">
+              <div class="kpi-glow"></div>
+              <div class="kpi-header">
+                <div class="kpi-icon-box">📦</div>
+                <span class="kpi-badge positive">+12.5% ↑</span>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Active Orders</span>
+                <div class="kpi-value-row">
+                  <span class="kpi-value" id="kpiOrders">34</span>
+                  <span class="kpi-unit">orders</span>
+                </div>
+                <span class="kpi-comparison">8 pending packaging</span>
+              </div>
+              <svg class="kpi-sparkline" viewBox="0 0 100 24" preserveAspectRatio="none">
+                <path d="M0,16 Q20,10 40,16 T70,8 T100,5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+
+            <!-- KPI 3: Average Order Value -->
+            <div class="kpi-card kpi-amber">
+              <div class="kpi-glow"></div>
+              <div class="kpi-header">
+                <div class="kpi-icon-box">🏷️</div>
+                <span class="kpi-badge positive">+5.2% ↑</span>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Average Basket (AOV)</span>
+                <div class="kpi-value-row">
+                  <span class="kpi-currency">₹</span>
+                  <span class="kpi-value" id="kpiAov">645</span>
+                </div>
+                <span class="kpi-comparison">Avg items per cart: 2.8</span>
+              </div>
+              <svg class="kpi-sparkline" viewBox="0 0 100 24" preserveAspectRatio="none">
+                <path d="M0,14 Q25,20 50,11 T75,12 T100,6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+
+            <!-- KPI 4: Storefront Visitors -->
+            <div class="kpi-card kpi-mint">
+              <div class="kpi-glow"></div>
+              <div class="kpi-header">
+                <div class="kpi-icon-box">✨</div>
+                <span class="kpi-badge positive">+24.8% ↑</span>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Store Visitors</span>
+                <div class="kpi-value-row">
+                  <span class="kpi-value" id="kpiVisitors">1,842</span>
+                  <span class="kpi-unit">live</span>
+                </div>
+                <span class="kpi-comparison">Conversion rate: 4.1%</span>
+              </div>
+              <svg class="kpi-sparkline" viewBox="0 0 100 24" preserveAspectRatio="none">
+                <path d="M0,20 Q20,15 40,8 T70,12 T100,3" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Main Analytics Chart Section -->
+          <div class="analytics-main-card">
+            <div class="chart-header-row">
+              <div class="chart-title-lockup">
+                <h3 class="chart-title">Wonderland Sales &amp; Orders Velocity</h3>
+                <p class="chart-desc">Real-time hourly revenue cadence and dispatch volumes</p>
+              </div>
+
+              <!-- Timeframe Switcher Tabs -->
+              <div class="timeframe-switch-pills" id="timeframeSelector">
+                <button class="tf-btn active" data-time="today">Today (24h)</button>
+                <button class="tf-btn" data-time="week">7 Days</button>
+                <button class="tf-btn" data-time="month">30 Days</button>
+                <button class="tf-btn" data-time="year">Yearly</button>
+              </div>
+            </div>
+
+            <!-- Custom Interactive Glowing SVG Area Chart -->
+            <div class="interactive-chart-container" id="chartContainer">
+              <div class="chart-tooltip" id="chartTooltip">
+                <div class="tooltip-time" id="tooltipTime">4:00 PM</div>
+                <div class="tooltip-rev" id="tooltipRev">₹6,840</div>
+                <div class="tooltip-orders" id="tooltipOrders">8 Orders</div>
+              </div>
+
+              <svg class="studio-vector-chart" id="salesSvgChart" viewBox="0 0 1000 320" preserveAspectRatio="none">
+                <defs>
+                  <!-- Gradient for Revenue Area -->
+                  <linearGradient id="roseGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#FF6584" stop-opacity="0.35"/>
+                    <stop offset="60%" stop-color="#B388FF" stop-opacity="0.12"/>
+                    <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+                  </linearGradient>
+
+                  <linearGradient id="strokeGradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="#D9657B"/>
+                    <stop offset="50%" stop-color="#8B5CF6"/>
+                    <stop offset="100%" stop-color="#059669"/>
+                  </linearGradient>
+
+                  <!-- Filter for glowing line -->
+                  <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+
+                <!-- Grid Horizontal Guidelines -->
+                <g class="chart-grid-lines">
+                  <line x1="40" y1="40" x2="980" y2="40" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4 4"/>
+                  <line x1="40" y1="110" x2="980" y2="110" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4 4"/>
+                  <line x1="40" y1="180" x2="980" y2="180" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4 4"/>
+                  <line x1="40" y1="250" x2="980" y2="250" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4 4"/>
+                </g>
+
+                <!-- Dynamic Area Fill & Stroke Path -->
+                <path id="chartAreaPath" d="" fill="url(#roseGradient)"/>
+                <path id="chartStrokePath" d="" fill="none" stroke="url(#strokeGradient)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glowEffect)"/>
+
+                <!-- Interactive Hover Pointer & Dots -->
+                <g id="chartPointsGroup"></g>
+                <line id="chartCrosshair" x1="0" y1="20" x2="0" y2="280" stroke="#FF4D8D" stroke-width="1.5" stroke-dasharray="3 3" opacity="0"/>
+                <circle id="chartActiveDot" cx="0" cy="0" r="6" fill="#FFFFFF" stroke="#FF4D8D" stroke-width="3" opacity="0"/>
+              </svg>
+
+              <!-- X-Axis Labels -->
+              <div class="chart-x-labels" id="chartXLabels">
+                <span>00:00</span>
+                <span>04:00</span>
+                <span>08:00</span>
+                <span>12:00</span>
+                <span>16:00</span>
+                <span>20:00</span>
+                <span>23:59</span>
+              </div>
+            </div>
+
+            <!-- Quick Chart Meta Highlights -->
+            <div class="chart-meta-footer">
+              <div class="meta-stat">
+                <span class="meta-label">Peak Sales Window</span>
+                <span class="meta-value">06:00 PM – 09:30 PM (₹19,450)</span>
+              </div>
+              <div class="meta-stat">
+                <span class="meta-label">Top Selling Category</span>
+                <span class="meta-value">🎀 Hair Accessories (41% share)</span>
+              </div>
+              <div class="meta-stat">
+                <span class="meta-label">Preferred Payment</span>
+                <span class="meta-value">⚡ UPI Instant Pay (68%)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Two-Column Bottom Deck: Live Orders Feed & High Velocity Products -->
+          <div class="dashboard-bottom-grid">
+            
+            <!-- Left: Live Recent Orders Feed -->
+            <div class="deck-card">
+              <div class="deck-header">
+                <div class="deck-title-lockup">
+                  <span class="deck-emoji">⚡</span>
+                  <div>
+                    <h4 class="deck-title">Live Order Dispatch Queue</h4>
+                    <span class="deck-sub">Real-time orders awaiting packing &amp; shipment</span>
+                  </div>
+                </div>
+                <button class="view-link-btn" id="goToOrdersBtn">View All ➔</button>
+              </div>
+
+              <div class="mini-orders-list" id="dashboardOrdersList">
+                <!-- Dynamically populated by JS -->
+              </div>
+            </div>
+
+            <!-- Right: Fast Selling Items & Stock Alert -->
+            <div class="deck-card">
+              <div class="deck-header">
+                <div class="deck-title-lockup">
+                  <span class="deck-emoji">🔥</span>
+                  <div>
+                    <h4 class="deck-title">Hot Sellers &amp; Stock Pulse</h4>
+                    <span class="deck-sub">Fastest moving wonderland products today</span>
+                  </div>
+                </div>
+                <button class="view-link-btn" id="goToProductsBtn">Manage Inventory ➔</button>
+              </div>
+
+              <div class="hot-products-list" id="dashboardHotProducts">
+                <!-- Dynamically populated by JS -->
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+
+        <!-- ============================================ -->
+        <!-- VIEW 2: ORDERS & DISPATCH PIPELINE           -->
+        <!-- ============================================ -->
+        <section class="view-panel" id="view-orders">
+          
+          <div class="view-headline-row">
+            <div>
+              <div class="view-eyebrow">
+                <span class="sparkle-icon">🛍️</span>
+                <span>LOGISTICS &amp; FULFILLMENT</span>
+              </div>
+              <h1 class="view-title">Orders &amp; Dispatch</h1>
+              <p class="view-subtitle">Manage customer deliveries, print cute packing slips, and ping tracking on WhatsApp.</p>
+            </div>
+
+            <div class="headline-actions">
+              <button class="action-btn secondary-btn" id="exportOrdersCsvBtn">
+                <span class="btn-icon">📥</span>
+                <span>Export CSV</span>
+              </button>
+              <button class="action-btn primary-glow-btn" id="simulateOrderBtn">
+                <span class="btn-icon">⚡</span>
+                <span>Simulate New Order</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Order Status Pills & Search Filter -->
+          <div class="orders-filter-bar">
+            <div class="order-status-tabs" id="orderStatusTabs">
+              <button class="status-tab active" data-status="all">
+                All Orders <span class="tab-count" id="countAllOrders">34</span>
+              </button>
+              <button class="status-tab" data-status="New">
+                ⚡ New <span class="tab-count count-new" id="countNewOrders">8</span>
+              </button>
+              <button class="status-tab" data-status="Packed">
+                📦 Packed <span class="tab-count" id="countPackedOrders">11</span>
+              </button>
+              <button class="status-tab" data-status="Dispatched">
+                🚚 Shipped <span class="tab-count" id="countShippedOrders">10</span>
+              </button>
+              <button class="status-tab" data-status="Delivered">
+                ✨ Delivered <span class="tab-count" id="countDeliveredOrders">5</span>
+              </button>
+            </div>
+
+            <div class="orders-search-wrap">
+              <input type="text" id="orderFilterInput" placeholder="Filter by customer, phone, order #..." class="studio-input">
+            </div>
+          </div>
+
+          <!-- Orders Data Table Card -->
+          <div class="orders-table-card">
+            <div class="table-responsive">
+              <table class="studio-table" id="ordersTable">
+                <thead>
+                  <tr>
+                    <th>Order #</th>
+                    <th>Customer Details</th>
+                    <th>Items</th>
+                    <th>Total</th>
+                    <th>Payment</th>
+                    <th>Status</th>
+                    <th>Timeline</th>
+                    <th class="text-right">Action Tools</th>
+                  </tr>
+                </thead>
+                <tbody id="ordersTableBody">
+                  <!-- Populated dynamically by admin.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ============================================ -->
+        <!-- VIEW 3: PRODUCT MATRIX & INVENTORY           -->
+        <!-- ============================================ -->
+        <section class="view-panel" id="view-products">
+          
+          <div class="view-headline-row">
+            <div>
+              <div class="view-eyebrow">
+                <span class="sparkle-icon">📦</span>
+                <span>CATALOG &amp; STOCK HEALTH</span>
+              </div>
+              <h1 class="view-title">Product Matrix</h1>
+              <p class="view-subtitle">Manage your cute wonderland inventory, update stock levels, prices, and curated tags.</p>
+            </div>
+
+            <div class="headline-actions">
+              <button class="action-btn secondary-btn" id="stockAlertsFilterBtn">
+                <span class="btn-icon">⚠️</span>
+                <span>Low Stock Alert (3)</span>
+              </button>
+              <button class="action-btn primary-glow-btn" id="openAddProductModalBtn">
+                <span class="btn-icon">＋</span>
+                <span>New Product</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Catalog Toolbar -->
+          <div class="catalog-toolbar">
+            <div class="category-pills-row" id="productCategoryPills">
+              <button class="cat-filter-pill active" data-category="all">All Products</button>
+              <button class="cat-filter-pill" data-category="Hair Accessories">🎀 Hair Accessories</button>
+              <button class="cat-filter-pill" data-category="Return Gifts">🎁 Return Gifts</button>
+              <button class="cat-filter-pill" data-category="Handbags &amp; Purses">🛍️ Handbags</button>
+              <button class="cat-filter-pill" data-category="Toys">🧸 Toys</button>
+              <button class="cat-filter-pill" data-category="Stationery">✏️ Stationery</button>
+              <button class="cat-filter-pill" data-category="Home &amp; Lifestyle">🏠 Home</button>
+              <button class="cat-filter-pill" data-category="Jewellery &amp; Fashion">💎 Jewellery</button>
+            </div>
+
+            <div class="catalog-tools-right">
+              <input type="text" id="productSearchInput" placeholder="Search SKU, name, tags..." class="studio-input">
+              <div class="view-mode-toggle" id="viewModeToggle">
+                <button class="mode-btn active" data-mode="grid" title="Grid Card View">▦</button>
+                <button class="mode-btn" data-mode="table" title="Data Table View">☰</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Product Grid View -->
+          <div class="product-matrix-grid" id="productGrid">
+            <!-- Populated dynamically by admin.js -->
+          </div>
+
+          <!-- Product Table View (Hidden by default) -->
+          <div class="product-matrix-table-card hidden" id="productTableCard">
+            <table class="studio-table" id="productTable">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Category</th>
+                  <th>SKU</th>
+                  <th>Price</th>
+                  <th>Stock Inventory</th>
+                  <th>Status</th>
+                  <th>Curated Tag</th>
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="productTableBody">
+                <!-- Populated dynamically by admin.js -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+
+        <!-- ============================================ -->
+        <!-- VIEW: WHOLESALE PURCHASES & INVENTORY        -->
+        <!-- ============================================ -->
+        <section class="view-panel" id="view-wholesale">
+          
+          <div class="view-headline-row">
+            <div>
+              <div class="view-eyebrow">
+                <span class="sparkle-icon">🏭</span>
+                <span>B2B PROCUREMENT &amp; COST LEDGER</span>
+              </div>
+              <h1 class="view-title">Wholesale Purchases &amp; Inward</h1>
+              <p class="view-subtitle">Track bulk supplier orders, wholesale buying costs vs. selling prices, and projected profit margins.</p>
+            </div>
+
+            <div class="headline-actions">
+              <button class="action-btn secondary-btn" id="exportWholesaleCsvBtn">
+                <span class="btn-icon">📥</span>
+                <span>Export Ledger CSV</span>
+              </button>
+              <button class="action-btn primary-glow-btn" id="openAddWholesaleModalBtn">
+                <span class="btn-icon">＋</span>
+                <span>Log Wholesale Purchase</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Wholesale Aurora KPI Cards -->
+          <div class="kpi-grid">
+            <div class="kpi-card kpi-rose">
+              <div class="kpi-glow"></div>
+              <div class="kpi-header">
+                <div class="kpi-icon-box">💰</div>
+                <span class="kpi-badge positive">Capital Spent</span>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Total Wholesale Spend</span>
+                <div class="kpi-value-row">
+                  <span class="kpi-currency">₹</span>
+                  <span class="kpi-value" id="kpiWholesaleSpend">0</span>
+                </div>
+                <span class="kpi-comparison" id="kpiWholesaleSpendSub">Invested across suppliers</span>
+              </div>
+            </div>
+
+            <div class="kpi-card kpi-violet">
+              <div class="kpi-glow"></div>
+              <div class="kpi-header">
+                <div class="kpi-icon-box">📦</div>
+                <span class="kpi-badge positive">Inventory In</span>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Total Units Procured</span>
+                <div class="kpi-value-row">
+                  <span class="kpi-value" id="kpiWholesaleUnits">0</span>
+                  <span class="kpi-unit">pcs</span>
+                </div>
+                <span class="kpi-comparison" id="kpiWholesaleUnitsSub">Stock added to inventory</span>
+              </div>
+            </div>
+
+            <div class="kpi-card kpi-amber">
+              <div class="kpi-glow"></div>
+              <div class="kpi-header">
+                <div class="kpi-icon-box">🏷️</div>
+                <span class="kpi-badge positive">Product Varieties</span>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Unique Products Bought</span>
+                <div class="kpi-value-row">
+                  <span class="kpi-value" id="kpiWholesaleProducts">0</span>
+                  <span class="kpi-unit">items</span>
+                </div>
+                <span class="kpi-comparison" id="kpiWholesaleVendorsSub">From trusted suppliers</span>
+              </div>
+            </div>
+
+            <div class="kpi-card kpi-mint">
+              <div class="kpi-glow"></div>
+              <div class="kpi-header">
+                <div class="kpi-icon-box">📈</div>
+                <span class="kpi-badge positive" id="kpiWholesaleMarginPct">+0% Avg Margin</span>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-label">Projected Gross Profit</span>
+                <div class="kpi-value-row">
+                  <span class="kpi-currency">₹</span>
+                  <span class="kpi-value" id="kpiWholesaleProfit">0</span>
+                </div>
+                <span class="kpi-comparison" id="kpiWholesaleRetailSub">Est. Retail Value: ₹0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Wholesale Filter & Search Bar -->
+          <div class="wholesale-filter-bar">
+            <div class="wholesale-search-box">
+              <span class="ws-search-lens">🔍</span>
+              <input type="text" id="wholesaleSearchInput" placeholder="Search supplier, bill #, or product name...">
+            </div>
+
+            <div class="wholesale-filters-right">
+              <select id="wholesaleCategoryFilter" class="studio-select-filter">
+                <option value="all">All Categories</option>
+                <option value="Hair Accessories">🎀 Hair Accessories</option>
+                <option value="Return Gifts">🎁 Return Gifts</option>
+                <option value="Handbags &amp; Purses">🛍️ Handbags &amp; Purses</option>
+                <option value="Toys">🧸 Toys</option>
+                <option value="Stationery">✏️ Stationery</option>
+                <option value="Home &amp; Lifestyle">🏠 Home &amp; Lifestyle</option>
+                <option value="Jewellery &amp; Fashion">💎 Jewellery &amp; Fashion</option>
+              </select>
+
+              <select id="wholesalePaymentFilter" class="studio-select-filter">
+                <option value="all">All Payment Statuses</option>
+                <option value="Paid">🟢 Fully Paid</option>
+                <option value="Partial">🟡 Partial Paid</option>
+                <option value="Credit">🔴 Credit / Due</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Wholesale Table Container -->
+          <div class="orders-table-card wholesale-table-card">
+            <table class="studio-table wholesale-table">
+              <thead>
+                <tr>
+                  <th>Date &amp; Bill #</th>
+                  <th>Supplier / Vendor</th>
+                  <th>Product &amp; Category</th>
+                  <th>Qty &amp; Unit Cost</th>
+                  <th>Total Spent</th>
+                  <th>Target Selling Price</th>
+                  <th>Expected Profit &amp; Margin</th>
+                  <th>Payment</th>
+                  <th class="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="wholesaleTableBody">
+                <!-- Populated dynamically by admin.js -->
+              </tbody>
+            </table>
+          </div>
+
+        </section>
+
+
+        <!-- ============================================ -->
+        <!-- VIEW 4: PROMO & COUPON WIZARD                -->
+        <!-- ============================================ -->
+        <section class="view-panel" id="view-marketing">
+          
+          <div class="view-headline-row">
+            <div>
+              <div class="view-eyebrow">
+                <span class="sparkle-icon">🏷️</span>
+                <span>STORE MARKETING &amp; OFFERS</span>
+              </div>
+              <h1 class="view-title">Promo &amp; Coupons</h1>
+              <p class="view-subtitle">Create irresistible discount codes, flash sales, and announcement bar alerts for Mayza Mart.</p>
+            </div>
+
+            <div class="headline-actions">
+              <button class="action-btn primary-glow-btn" id="openAddCouponModalBtn">
+                <span class="btn-icon">＋</span>
+                <span>Create New Coupon</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Storefront Top Bar Marquee Announcement Card -->
+          <div class="marquee-editor-card">
+            <div class="marquee-header">
+              <div class="marquee-title-wrap">
+                <span class="emoji-glow">📢</span>
+                <div>
+                  <h4 class="marquee-heading">Storefront Floating Announcement Ticker</h4>
+                  <p class="marquee-desc">This live message appears at the top banner of your customer storefront.</p>
+                </div>
+              </div>
+              <button class="action-btn secondary-btn" id="saveMarqueeBtn">Save Banner</button>
+            </div>
+            <div class="marquee-input-wrap">
+              <input type="text" id="marqueeTextInput" class="studio-input marquee-input" value="✨ Free Mayza Gift on orders above ₹499 • Use Code: WONDERLAND20 for 20% OFF! 💕">
+            </div>
+          </div>
+
+          <!-- Active Coupons Grid -->
+          <div class="coupons-grid-title">Active Wonder Coupons</div>
+          <div class="coupons-grid" id="couponsGrid">
+            <!-- Dynamically populated by admin.js -->
+          </div>
+        </section>
+
+
+        <!-- ============================================ -->
+        <!-- VIEW 5: WONDERLAND VIPS & REVIEWS            -->
+        <!-- ============================================ -->
+        <section class="view-panel" id="view-customers">
+          <div class="view-headline-row">
+            <div>
+              <div class="view-eyebrow">
+                <span class="sparkle-icon">👑</span>
+                <span>COMMUNITY &amp; REVIEWS</span>
+              </div>
+              <h1 class="view-title">Wonderland VIPs</h1>
+              <p class="view-subtitle">Top loyal customers, recent customer reviews, and founder appreciation notes.</p>
+            </div>
+          </div>
+
+          <!-- VIP Customer Cards Grid -->
+          <div class="vips-grid" id="vipsGrid">
+            <!-- Populated dynamically by admin.js -->
+          </div>
+
+          <!-- Customer Reviews Moderation Deck -->
+          <div class="reviews-moderation-card">
+            <h3 class="card-section-title">Customer Love &amp; 5★ Reviews</h3>
+            <div class="reviews-list" id="reviewsList">
+              <!-- Populated dynamically by admin.js -->
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ============================================ -->
+        <!-- VIEW 6: STUDIO SETTINGS                      -->
+        <!-- ============================================ -->
+        <section class="view-panel" id="view-settings">
+          <div class="view-headline-row">
+            <div>
+              <div class="view-eyebrow">
+                <span class="sparkle-icon">⚙️</span>
+                <span>CONFIGURATION</span>
+              </div>
+              <h1 class="view-title">Studio Settings</h1>
+              <p class="view-subtitle">Manage store preferences, shipping courier partners, and data backup.</p>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <div class="setting-block">
+              <h4 class="setting-title">Store Identity</h4>
+              <div class="setting-field">
+                <label>Store Name</label>
+                <input type="text" class="studio-input" value="Mayza Mart Wonderland">
+              </div>
+              <div class="setting-field">
+                <label>Cousins / Founders</label>
+                <input type="text" class="studio-input" value="Mauji, Aynul, and Faiza">
+              </div>
+              <div class="setting-field">
+                <label>Support Email</label>
+                <input type="text" class="studio-input" value="hello@mayzamart.in">
+              </div>
+            </div>
+
+            <div class="setting-block">
+              <h4 class="setting-title">Shipping &amp; Logistics</h4>
+              <div class="setting-field">
+                <label>Primary Courier Partner</label>
+                <select class="studio-input">
+                  <option selected>Delhivery Express</option>
+                  <option>Blue Dart Air</option>
+                  <option>Shiprocket Smart</option>
+                  <option>DTDC Courier</option>
+                </select>
+              </div>
+              <div class="setting-field">
+                <label>Free Shipping Threshold</label>
+                <input type="number" class="studio-input" value="499">
+              </div>
+            </div>
+
+            <div class="setting-block full-col">
+              <h4 class="setting-title">Local Demo Data &amp; Reset</h4>
+              <p class="setting-desc">All changes you make in this admin panel are saved automatically in your browser storage. You can restore default store data anytime.</p>
+              <button class="action-btn danger-btn" id="resetDataBtn">
+                <span>⚠️ Reset to Default Demo Data</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+
+  <!-- ============================================ -->
+  <!-- MODAL 1: ADD / EDIT PRODUCT MODAL           -->
+  <!-- ============================================ -->
+  <div class="studio-modal-overlay" id="productModal" aria-hidden="true">
+    <div class="studio-modal glass-card">
+      <div class="modal-header">
+        <div class="modal-title-lockup">
+          <span class="modal-badge-sparkle">✨</span>
+          <h3 class="modal-title" id="productModalTitle">Add New Wonderland Product</h3>
+        </div>
+        <button class="modal-close-btn" id="closeProductModalBtn">&times;</button>
+      </div>
+
+      <form id="productForm" class="modal-body">
+        <input type="hidden" id="editProductId">
+
+        <div class="modal-form-grid">
+          <div class="form-group full-col">
+            <label for="prodTitle">Product Name *</label>
+            <input type="text" id="prodTitle" class="studio-input" placeholder="e.g., Cute Pastel Hair Clip Set (Pack of 12)" required>
+          </div>
+
+          <div class="form-group">
+            <label for="prodCategory">Category *</label>
+            <select id="prodCategory" class="studio-input" required>
+              <option value="Hair Accessories">🎀 Hair Accessories</option>
+              <option value="Return Gifts">🎁 Return Gifts</option>
+              <option value="Handbags &amp; Purses">🛍️ Handbags &amp; Purses</option>
+              <option value="Toys">🧸 Toys</option>
+              <option value="Stationery">✏️ Stationery</option>
+              <option value="Home &amp; Lifestyle">🏠 Home &amp; Lifestyle</option>
+              <option value="Jewellery &amp; Fashion">💎 Jewellery &amp; Fashion</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="prodSku">SKU Code</label>
+            <input type="text" id="prodSku" class="studio-input font-mono" placeholder="MM-HAIR-09">
+          </div>
+
+          <div class="form-group">
+            <label for="prodPrice">Selling Price (₹) *</label>
+            <input type="number" id="prodPrice" class="studio-input" placeholder="249" required min="1">
+          </div>
+
+          <div class="form-group">
+            <label for="prodComparePrice">Original / MRP (₹)</label>
+            <input type="number" id="prodComparePrice" class="studio-input" placeholder="399" min="1">
+          </div>
+
+          <div class="form-group">
+            <label for="prodStock">Stock Inventory Units *</label>
+            <input type="number" id="prodStock" class="studio-input" placeholder="45" required min="0">
+          </div>
+
+          <div class="form-group">
+            <label for="prodTag">Curated Tag</label>
+            <select id="prodTag" class="studio-input">
+              <option value="Best Seller">👑 Best Seller</option>
+              <option value="Cousin's Pick">💖 Cousin's Pick</option>
+              <option value="New Arrival">✨ New Arrival</option>
+              <option value="Trending">🔥 Trending</option>
+              <option value="None">None</option>
+            </select>
+          </div>
+
+          <div class="form-group full-col">
+            <label for="prodImageSelect">Product Image Asset</label>
+            <select id="prodImageSelect" class="studio-input">
+              <option value="assets/p-clips.jpg">Hair Clips (assets/p-clips.jpg)</option>
+              <option value="assets/p-giftbox.jpg">Unicorn Gift Box (assets/p-giftbox.jpg)</option>
+              <option value="assets/p-handbag.jpg">Handbag (assets/p-handbag.jpg)</option>
+              <option value="assets/p-bottle.jpg">Water Bottle (assets/p-bottle.jpg)</option>
+              <option value="assets/p-candle.jpg">Aroma Candle (assets/p-candle.jpg)</option>
+              <option value="assets/p-scrunchies.jpg">Silk Scrunchies (assets/p-scrunchies.jpg)</option>
+              <option value="assets/cat-stationery.jpg">Stationery Kit (assets/cat-stationery.jpg)</option>
+              <option value="assets/cat-toys.jpg">Plush Toy (assets/cat-toys.jpg)</option>
+              <option value="assets/cat-jewellery.jpg">Jewellery Set (assets/cat-jewellery.jpg)</option>
+              <option value="custom">-- Custom Image URL --</option>
+            </select>
+            <input type="text" id="prodCustomImageUrl" class="studio-input hidden mt-2" placeholder="Enter custom image URL...">
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="action-btn secondary-btn" id="cancelProductBtn">Cancel</button>
+          <button type="submit" class="action-btn primary-glow-btn">
+            <span class="btn-icon">💾</span>
+            <span id="saveProductBtnText">Save Product</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ============================================ -->
+  <!-- MODAL 2: BRIGHT & CUTE PRINTABLE INVOICE    -->
+  <!-- ============================================ -->
+  <div class="studio-modal-overlay" id="invoiceModal" aria-hidden="true">
+    <div class="studio-modal invoice-modal glass-card">
+      <div class="modal-header no-print">
+        <div class="modal-title-lockup">
+          <span class="modal-badge-sparkle">🖨️</span>
+          <h3 class="modal-title">Mayza Packing Slip &amp; Tax Invoice</h3>
+        </div>
+        <div class="modal-actions-right">
+          <button class="action-btn primary-glow-btn" id="printInvoiceBtn">
+            <span>🖨️ Print Slip</span>
+          </button>
+          <button class="modal-close-btn" id="closeInvoiceModalBtn">&times;</button>
+        </div>
+      </div>
+
+      <!-- Printable Invoice Sheet -->
+      <div class="invoice-printable-sheet" id="invoicePrintArea">
+        <div class="inv-top-bar">
+          <div class="inv-brand">
+            <img src="mascot.png" alt="Mayza Logo" class="inv-mascot">
+            <div>
+              <h2 class="inv-store-name">Mayza Mart Wonderland</h2>
+              <p class="inv-founders">Mauji, Aynul &amp; Faiza • Delivering Daily Joy 💖</p>
+              <p class="inv-contact">GSTIN: 07AABCM8899Q1Z5 • support@mayzamart.in</p>
+            </div>
+          </div>
+          <div class="inv-badge-block">
+            <div class="inv-badge-pill">OFFICIAL ORDER DISPATCH</div>
+            <div class="inv-barcode" id="invBarcode">||||||||||||||||||||||||||</div>
+            <div class="inv-order-id" id="invOrderId">#MM-8841</div>
+          </div>
+        </div>
+
+        <hr class="inv-divider">
+
+        <div class="inv-addresses-grid">
+          <div class="inv-box">
+            <span class="inv-box-title">DELIVER TO (CUSTOMER)</span>
+            <div class="inv-customer-name" id="invCustName">Ananya Sharma</div>
+            <div class="inv-detail-line" id="invCustPhone">+91 98765 43210</div>
+            <div class="inv-detail-line" id="invCustAddress">Flat 402, Lotus Blossom Heights, Bandra West, Mumbai, MH - 400050</div>
+          </div>
+          <div class="inv-box">
+            <span class="inv-box-title">DISPATCH DETAILS</span>
+            <div class="inv-meta-row"><span>Date:</span> <strong id="invDate">17 Sep 2026</strong></div>
+            <div class="inv-meta-row"><span>Courier:</span> <strong>Delhivery Air Express</strong></div>
+            <div class="inv-meta-row"><span>Payment:</span> <strong id="invPaymentMode">Prepaid UPI</strong></div>
+            <div class="inv-meta-row"><span>Status:</span> <strong id="invStatus">Packed</strong></div>
+          </div>
+        </div>
+
+        <!-- Items Table -->
+        <table class="inv-items-table">
+          <thead>
+            <tr>
+              <th>Item Description</th>
+              <th>SKU</th>
+              <th>Qty</th>
+              <th>Unit Price</th>
+              <th class="text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody id="invItemsTableBody">
+            <!-- Dynamically populated -->
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" class="text-right">Subtotal:</td>
+              <td class="text-right font-mono" id="invSubtotal">₹548</td>
+            </tr>
+            <tr>
+              <td colspan="4" class="text-right">Delivery:</td>
+              <td class="text-right font-mono" id="invShipping">FREE</td>
+            </tr>
+            <tr class="inv-total-row">
+              <td colspan="4" class="text-right"><strong>Grand Total:</strong></td>
+              <td class="text-right font-mono" id="invGrandTotal"><strong>₹548</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <!-- Cute Handwritten Sign-off -->
+        <div class="inv-footer-note">
+          <div class="note-stamp">
+            <span class="stamp-star">★</span>
+            <span>HANDPICKED &amp; PACKED WITH LOVE</span>
+          </div>
+          <p class="note-script">
+            "Thank you for shopping at Mayza Mart! We hope these cute treats bring a bright smile to your day!"
+          </p>
+          <p class="note-sign">— Warm hugs from Mauji, Aynul &amp; Faiza 🌸✨</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================ -->
+  <!-- MODAL 3: ADD COUPON MODAL                    -->
+  <!-- ============================================ -->
+  <div class="studio-modal-overlay" id="couponModal" aria-hidden="true">
+    <div class="studio-modal glass-card">
+      <div class="modal-header">
+        <div class="modal-title-lockup">
+          <span class="modal-badge-sparkle">🏷️</span>
+          <h3 class="modal-title">Create Wonder Coupon</h3>
+        </div>
+        <button class="modal-close-btn" id="closeCouponModalBtn">&times;</button>
+      </div>
+
+      <form id="couponForm" class="modal-body">
+        <div class="modal-form-grid">
+          <div class="form-group">
+            <label for="couponCode">Coupon Code *</label>
+            <input type="text" id="couponCode" class="studio-input font-mono uppercase" placeholder="e.g., FESTIVE25" required>
+          </div>
+          <div class="form-group">
+            <label for="couponDiscount">Discount % *</label>
+            <input type="number" id="couponDiscount" class="studio-input" placeholder="20" min="1" max="90" required>
+          </div>
+          <div class="form-group">
+            <label for="couponMinSpend">Min Cart Spend (₹)</label>
+            <input type="number" id="couponMinSpend" class="studio-input" placeholder="499" min="0">
+          </div>
+          <div class="form-group">
+            <label for="couponDesc">Coupon Description</label>
+            <input type="text" id="couponDesc" class="studio-input" placeholder="Festive discount on all hair accessories & gifts">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="action-btn secondary-btn" id="cancelCouponBtn">Cancel</button>
+          <button type="submit" class="action-btn primary-glow-btn">
+            <span>✨ Create Coupon</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- MODAL 4: LOG WHOLESALE PURCHASE MODAL       -->
+  <!-- ============================================ -->
+  <div class="studio-modal-overlay" id="wholesaleModal" aria-hidden="true">
+    <div class="studio-modal glass-card modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-lockup">
+          <span class="modal-badge-sparkle">🏭</span>
+          <h3 class="modal-title" id="wholesaleModalTitle">Log Wholesale Purchase (Bulk Buy)</h3>
+        </div>
+        <button class="modal-close-btn" id="closeWholesaleModalBtn">&times;</button>
+      </div>
+
+      <form id="wholesaleForm" class="modal-body">
+        <input type="hidden" id="editWholesaleId">
+
+        <div class="modal-form-grid">
+          <!-- Supplier Details -->
+          <div class="form-group">
+            <label for="wsSupplierName">Supplier / Wholesaler Name *</label>
+            <input type="text" id="wsSupplierName" class="studio-input" placeholder="e.g. Surat Textiles Hub" required>
+          </div>
+
+          <div class="form-group">
+            <label for="wsSupplierLocation">Supplier City / Market</label>
+            <input type="text" id="wsSupplierLocation" class="studio-input" placeholder="e.g. Surat, Gujarat">
+          </div>
+
+          <div class="form-group">
+            <label for="wsBillNumber">Bill / Invoice Number *</label>
+            <input type="text" id="wsBillNumber" class="studio-input font-mono uppercase" placeholder="e.g. INV-WS-108" required>
+          </div>
+
+          <div class="form-group">
+            <label for="wsPurchaseDate">Purchase Date *</label>
+            <input type="date" id="wsPurchaseDate" class="studio-input" required>
+          </div>
+
+          <!-- Product Details -->
+          <div class="form-group full-col">
+            <label for="wsProductSelect">Link to Existing Product (Optional)</label>
+            <select id="wsProductSelect" class="studio-input">
+              <option value="">-- New Product (Or pick existing store product) --</option>
+            </select>
+          </div>
+
+          <div class="form-group full-col">
+            <label for="wsProductName">Product Title / Description *</label>
+            <input type="text" id="wsProductName" class="studio-input" placeholder="e.g. Velvet Bow Hair Clips (Box of 50)" required>
+          </div>
+
+          <div class="form-group">
+            <label for="wsCategory">Category *</label>
+            <select id="wsCategory" class="studio-input" required>
+              <option value="Hair Accessories">🎀 Hair Accessories</option>
+              <option value="Return Gifts">🎁 Return Gifts</option>
+              <option value="Handbags &amp; Purses">🛍️ Handbags &amp; Purses</option>
+              <option value="Toys">🧸 Toys</option>
+              <option value="Stationery">✏️ Stationery</option>
+              <option value="Home &amp; Lifestyle">🏠 Home &amp; Lifestyle</option>
+              <option value="Jewellery &amp; Fashion">💎 Jewellery &amp; Fashion</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="wsQuantity">Quantity Bought (Units/Pieces) *</label>
+            <input type="number" id="wsQuantity" class="studio-input" placeholder="100" min="1" required>
+          </div>
+
+          <!-- Pricing & Calculations -->
+          <div class="form-group">
+            <label for="wsUnitCost">Wholesale Buying Price / Unit (₹) *</label>
+            <input type="number" id="wsUnitCost" class="studio-input" placeholder="60" min="0.01" step="0.01" required>
+          </div>
+
+          <div class="form-group">
+            <label for="wsSellingPrice">Target Selling Price / Retail MRP (₹) *</label>
+            <input type="number" id="wsSellingPrice" class="studio-input" placeholder="199" min="0.01" step="0.01" required>
+          </div>
+
+          <!-- Live Margin & Profit Preview Box -->
+          <div class="form-group full-col">
+            <div class="wholesale-margin-preview-box" id="wsMarginPreviewBox">
+              <div class="preview-item">
+                <span class="preview-label">Total Cost Spent:</span>
+                <span class="preview-val" id="prevTotalCost">₹0</span>
+              </div>
+              <div class="preview-divider"></div>
+              <div class="preview-item">
+                <span class="preview-label">Est. Retail Revenue:</span>
+                <span class="preview-val" id="prevRetailRev">₹0</span>
+              </div>
+              <div class="preview-divider"></div>
+              <div class="preview-item">
+                <span class="preview-label">Profit per Unit:</span>
+                <span class="preview-val text-mint" id="prevUnitProfit">+₹0</span>
+              </div>
+              <div class="preview-divider"></div>
+              <div class="preview-item">
+                <span class="preview-label">Projected Total Profit:</span>
+                <span class="preview-val text-mint" id="prevTotalProfit">+₹0</span>
+              </div>
+              <div class="preview-divider"></div>
+              <div class="preview-item">
+                <span class="preview-label">Markup Margin:</span>
+                <span class="preview-badge" id="prevMarginPct">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="wsPaymentStatus">Payment Status *</label>
+            <select id="wsPaymentStatus" class="studio-input" required>
+              <option value="Paid">🟢 Fully Paid</option>
+              <option value="Partial">🟡 Partial Paid</option>
+              <option value="Credit">🔴 Credit / Pending Due</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="wsPaymentMode">Payment Method</label>
+            <select id="wsPaymentMode" class="studio-input">
+              <option value="Bank NEFT / RTGS">Bank NEFT / RTGS</option>
+              <option value="UPI / GPay">UPI / GPay</option>
+              <option value="Cash on Delivery / Spot Cash">Spot Cash</option>
+              <option value="Cheque">Cheque</option>
+              <option value="30-Day Credit">30-Day Credit</option>
+            </select>
+          </div>
+
+          <div class="form-group full-col">
+            <label for="wsNotes">Supplier Notes / Bill Remarks</label>
+            <input type="text" id="wsNotes" class="studio-input" placeholder="e.g. Lot #12, includes 5% volume discount, delivery via VRL Logistics">
+          </div>
+
+          <!-- Auto-Sync Checkbox -->
+          <div class="form-group full-col">
+            <label class="studio-checkbox-label">
+              <input type="checkbox" id="wsSyncCheckbox" checked>
+              <span><strong>Automatically sync to Product Matrix:</strong> Add or increment stock units in the store catalog</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="action-btn secondary-btn" id="cancelWholesaleBtn">Cancel</button>
+          <button type="submit" class="action-btn primary-glow-btn">
+            <span class="btn-icon">💾</span>
+            <span id="saveWholesaleBtnText">Save Wholesale Purchase</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ============================================ -->
+  <!-- MODAL 5: WHOLESALE BILL BREAKDOWN SLIP      -->
+  <!-- ============================================ -->
+  <div class="studio-modal-overlay" id="wholesaleBillModal" aria-hidden="true">
+    <div class="studio-modal invoice-modal glass-card">
+      <div class="modal-header no-print">
+        <div class="modal-title-lockup">
+          <span class="modal-badge-sparkle">📄</span>
+          <h3 class="modal-title">Wholesale Procurement Voucher</h3>
+        </div>
+        <div class="modal-actions-right">
+          <button class="action-btn primary-glow-btn" id="printWholesaleBillBtn">
+            <span>🖨️ Print Voucher</span>
+          </button>
+          <button class="modal-close-btn" id="closeWholesaleBillModalBtn">&times;</button>
+        </div>
+      </div>
+
+      <!-- Printable Sheet -->
+      <div class="invoice-printable-sheet" id="wholesalePrintArea">
+        <!-- Populated dynamically by admin.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="studio-toast-rack" id="toastRack"></div>
+
+  <!-- Main Admin Logic Script -->
+  <script src="admin.js"></script>
+</body>
+</html>

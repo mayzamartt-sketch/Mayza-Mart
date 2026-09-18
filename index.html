@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Step into Mayza Mart Wonderland</title>
+  <meta name="description" content="Step into Mayza Mart Wonderland — a delightful interactive shopping experience with our animated mascot.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Playfair+Display:ital,wght@0,600;1,600&family=Baloo+2:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Quicksand:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- GSAP for buttery smooth 60fps choreographed animation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <!-- Canvas Confetti for celebration sparkle effects -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+  <!-- Ambient Floating Background Elements -->
+  <div class="ambient-bg" aria-hidden="true">
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+    <div class="glow-orb orb-3"></div>
+    <div class="floating-sparkle sp-1">✦</div>
+    <div class="floating-sparkle sp-2">♥</div>
+    <div class="floating-sparkle sp-3">✦</div>
+    <div class="floating-sparkle sp-4">✨</div>
+    <div class="floating-sparkle sp-5">♥</div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- SPLASH / ENTER WONDERLAND INTERACTIVE SCREEN -->
+  <!-- ============================================ -->
+  <div class="intro-overlay" id="introOverlay">
+    <div class="intro-card">
+      <div class="intro-mascot-wrapper">
+        <div class="intro-glow-ring"></div>
+        <img src="mascot.png" alt="Mayza Mascot" class="intro-mascot-img">
+        <span class="intro-float-sparkle fsp-1">✨</span>
+        <span class="intro-float-sparkle fsp-2">💖</span>
+      </div>
+      <div class="intro-badge">
+        <span class="intro-pulse"></span>
+        <span>Founded by 3 Cousins</span>
+      </div>
+      <h1 class="intro-title">Step into Mayza Mart Wonderland</h1>
+      
+      <div class="founders-pill">
+        <span class="founder-tag">🍓 <strong>M</strong>auji</span>
+        <span class="founder-dot">•</span>
+        <span class="founder-tag">🌸 <strong>Ay</strong>nul</span>
+        <span class="founder-dot">•</span>
+        <span class="founder-tag">✨ Fai<strong>za</strong></span>
+      </div>
+
+      <p class="intro-subtitle">Three cousins united by one dream. Mauji, Aynul, and Faiza welcome you to our handpicked wonderland of cute finds & everyday joy!</p>
+      
+      <button class="intro-enter-btn" id="startExperienceBtn" aria-label="Enter Mayza Mart Wonderland">
+        <span class="btn-sparkle-icon">✨</span>
+        <span class="btn-text">Enter Wonderland</span>
+        <span class="btn-arrow-icon">➔</span>
+      </button>
+
+      <div class="intro-quote">
+        <span class="quote-heart">💕</span>
+        <span>Cousins by blood, partners in magic — welcome to our wonderland</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Animation Stage -->
+  <main class="stage-container" id="stageContainer">
+    <!-- Top Bar Controls -->
+    <header class="top-nav">
+      <div class="brand-badge">
+        <span class="pulse-dot"></span>
+        <span>Step into Mayza Mart Wonderland</span>
+      </div>
+      <div class="control-actions">
+        <button id="replayBtn" class="control-btn" aria-label="Replay Animation" title="Replay">
+          <span class="icon">↻</span>
+          <span class="label">Replay</span>
+        </button>
+        <button id="quickStoreBtn" class="control-btn store-quick-btn" title="View Storefront">
+          <span class="icon">🛍️</span>
+          <span class="label">Store</span>
+        </button>
+        <a href="/admin" class="control-btn admin-quick-btn" title="Open Wonderland Admin Studio" style="display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, rgba(255,77,141,0.2), rgba(158,123,255,0.2)); border:1px solid rgba(255,77,141,0.4); color:#FFB3CE; padding:6px 12px; border-radius:20px; font-size:13px; font-weight:700; text-decoration:none;">
+          <span class="icon">⚡</span>
+          <span class="label">Admin</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Center Animation Canvas / SVG Presentation -->
+    <div class="logo-animation-wrapper" id="logoWrapper">
+      <!-- Interactive Mascot Speech Bubble -->
+      <div class="mascot-speech-bubble" id="speechBubble">
+        <span>Hi there! Welcome to Mayza Mart 💕</span>
+      </div>
+
+      <!-- Main Master SVG -->
+      <svg id="mayzaSvg" viewBox="0 0 880 700" class="mayza-canvas" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- Soft Drop Shadow Filter -->
+          <filter id="cuteShadow" x="-15%" y="-15%" width="130%" height="130%">
+            <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#D9657B" flood-opacity="0.18" />
+          </filter>
+
+          <!-- Mascot Soft Shadow -->
+          <filter id="mascotShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#7C2A3C" flood-opacity="0.14" />
+          </filter>
+
+          <!-- Berry Pink Linear Gradient for depth -->
+          <linearGradient id="berryGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#E57288" />
+            <stop offset="100%" stop-color="#C7546A" />
+          </linearGradient>
+
+          <!-- Rich Dark Pink Gradient for Center Letter "y" -->
+          <linearGradient id="darkPinkGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#FF2A7A" />
+            <stop offset="45%" stop-color="#D81B60" />
+            <stop offset="100%" stop-color="#880E4F" />
+          </linearGradient>
+
+          <!-- Golden/Pink Sparkle Filter -->
+          <filter id="sparkleGlow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+
+          <!-- Wheel Rim Radial Gradient -->
+          <radialGradient id="wheelGrad" cx="35%" cy="35%" r="65%">
+            <stop offset="0%" stop-color="#FF92A6" />
+            <stop offset="60%" stop-color="#D9657B" />
+            <stop offset="100%" stop-color="#B7465C" />
+          </radialGradient>
+
+          <!-- Eye Pupil Gradient -->
+          <linearGradient id="eyeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#3D1D24" />
+            <stop offset="100%" stop-color="#692837" />
+          </linearGradient>
+
+          <!-- Hair Gradient -->
+          <linearGradient id="hairGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#5B2935" />
+            <stop offset="60%" stop-color="#441E26" />
+            <stop offset="100%" stop-color="#30131A" />
+          </linearGradient>
+        </defs>
+
+        <!-- ============================================ -->
+        <!-- LAYER 0: Ground Shadow                       -->
+        <!-- ============================================ -->
+        <ellipse id="groundShadow" cx="440" cy="590" rx="300" ry="18" fill="#E8BDC4" opacity="0.45" />
+
+        <!-- ============================================ -->
+        <!-- ============================================ -->
+        <!-- LAYER 1: ADORABLE 3 FOUNDERS (Mauji, Aynul & Faiza) -->
+        <!-- ============================================ -->
+        <g id="mascotGroup" class="interactive-mascot" filter="url(#mascotShadow)">
+          <!-- Character Illustration Image centered in the SVG canvas (center at x=440) -->
+          <image id="mascotImage" href="mascot.png" x="235" y="-30" width="410" height="615" preserveAspectRatio="xMidYMid meet" />
+
+          <!-- Clickable mascot trigger area -->
+          <rect id="mascotHitbox" x="235" y="-25" width="410" height="380" fill="transparent" style="cursor: pointer;" />
+        </g>
+
+        <!-- ============================================ -->
+        <!-- LAYER 2: THE SHOPPING CART "M" SWOOSH BASE   -->
+        <!-- ============================================ -->
+        <g id="cartSwooshGroup" filter="url(#cuteShadow)">
+          <!-- The sweeping stroke of the "M" that extends down and scoops into the shopping cart bottom -->
+          <path id="cartBaseUnderline" 
+                d="M 285,325 
+                   C 285,440 295,530 335,570 
+                   C 370,600 440,600 540,600 
+                   C 630,600 690,580 730,520 
+                   C 738,508 732,492 718,492 
+                   C 705,492 696,504 688,518 
+                   C 656,560 610,572 540,572 
+                   C 445,572 385,565 358,542 
+                   C 328,515 318,440 315,335 Z"
+                fill="url(#berryGrad)" />
+
+          <!-- Glossy inner highlight along the cart basket curve -->
+          <path id="cartBasketHighlight"
+                d="M 345,550 C 375,578 450,585 540,585 C 600,585 645,570 680,535"
+                stroke="#FFA2B4" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.8" />
+        </g>
+
+        <!-- ============================================ -->
+        <!-- LAYER 3: "MAYZA" MAIN TYPOGRAPHY & HIGHLIGHTS -->
+        <!-- ============================================ -->
+        <g id="mayzaTypographyGroup" filter="url(#cuteShadow)">
+          <!-- Plump Glossy "M" -->
+          <g id="letterM" class="bubbly-letter">
+            <path d="M 135,430 
+                     C 115,430 100,400 105,350 
+                     C 110,285 140,225 195,215 
+                     C 235,208 260,235 270,270 
+                     C 285,230 315,210 355,225 
+                     C 395,240 405,290 390,360 
+                     C 385,385 370,400 350,395 
+                     C 330,390 335,370 345,330 
+                     C 355,285 340,260 320,255 
+                     C 295,250 270,275 260,330 
+                     L 255,360 
+                     C 250,385 230,400 210,390 
+                     C 195,380 198,360 205,320 
+                     C 215,275 200,245 180,245 
+                     C 150,245 135,300 130,365 
+                     C 128,395 140,425 135,430 Z" 
+                  fill="url(#berryGrad)" />
+            
+            <!-- High-gloss shine specular spots -->
+            <ellipse cx="170" cy="245" rx="16" ry="28" transform="rotate(-25 170 245)" fill="#FFFFFF" opacity="0.75" />
+            <circle cx="150" cy="295" r="9" fill="#FFFFFF" opacity="0.65" />
+            <ellipse cx="330" cy="250" rx="10" ry="18" transform="rotate(-15 330 250)" fill="#FFFFFF" opacity="0.65" />
+          </g>
+
+          <!-- Plump Glossy "a" -->
+          <g id="letterA1" class="bubbly-letter">
+            <path d="M 415,335 
+                     C 390,335 375,355 375,385 
+                     C 375,420 400,440 430,440 
+                     C 455,440 470,425 475,405 
+                     L 475,430 C 475,440 495,440 498,430 
+                     L 498,365 C 498,340 480,335 450,335 Z
+                     M 435,365 C 455,365 465,380 465,395 C 465,415 450,422 435,422 C 415,422 405,410 405,392 C 405,372 418,365 435,365 Z" 
+                  fill="url(#berryGrad)" fill-rule="evenodd" />
+            <path d="M 410,360 Q 435,350 455,358" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" fill="none" opacity="0.75" />
+          </g>
+
+          <!-- Plump Glossy "y" (Special Dark Pink with Sparkle) -->
+          <g id="letterY" class="bubbly-letter letter-y-special">
+            <path d="M 515,345 
+                     C 525,345 530,365 535,385 
+                     C 545,415 555,425 570,390 
+                     L 580,360 C 585,345 605,350 600,365 
+                     L 572,415 
+                     C 560,436 545,440 530,436 
+                     C 518,432 522,418 532,420 
+                     C 542,422 550,416 554,402 
+                     L 500,365 C 495,350 508,345 515,345 Z" 
+                  fill="url(#darkPinkGrad)" />
+            <ellipse cx="525" cy="370" rx="4" ry="10" transform="rotate(20 525 370)" fill="#FFFFFF" opacity="0.85" />
+
+            <!-- Magical Sparkle Stars for Letter Y -->
+            <g class="sparkle-star sparkle-star-1" transform="translate(595, 348)">
+              <path d="M 0,-14 Q 0,0 14,0 Q 0,0 0,14 Q 0,0 -14,0 Q 0,0 0,-14 Z" fill="#FFFFFF" />
+              <circle cx="0" cy="0" r="3" fill="#FF4081" />
+            </g>
+            <g class="sparkle-star sparkle-star-2" transform="translate(515, 428)">
+              <path d="M 0,-10 Q 0,0 10,0 Q 0,0 0,10 Q 0,0 -10,0 Q 0,0 0,-10 Z" fill="#FFFFFF" />
+              <circle cx="0" cy="0" r="2.5" fill="#FF80AB" />
+            </g>
+            <g class="sparkle-star sparkle-star-3" transform="translate(554, 386)">
+              <path d="M 0,-8 Q 0,0 8,0 Q 0,0 0,8 Q 0,0 -8,0 Q 0,0 0,-8 Z" fill="#FFF0F5" />
+              <circle cx="0" cy="0" r="2" fill="#FFFFFF" />
+            </g>
+          </g>
+
+          <!-- Plump Glossy "z" -->
+          <g id="letterZ" class="bubbly-letter">
+            <path d="M 620,345 L 685,345 C 698,345 698,365 685,372 L 645,412 L 685,412 C 698,412 698,435 680,435 L 615,435 C 602,435 602,418 615,410 L 655,370 L 620,370 C 605,370 605,345 620,345 Z" 
+                  fill="url(#berryGrad)" />
+            <path d="M 630,352 L 675,352" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.8" />
+          </g>
+
+          <!-- Plump Glossy "a" (Second) -->
+          <g id="letterA2" class="bubbly-letter">
+            <path d="M 715,335 
+                     C 690,335 675,355 675,385 
+                     C 675,420 700,440 730,440 
+                     C 755,440 770,425 775,405 
+                     L 775,430 C 775,440 795,440 798,430 
+                     L 798,365 C 798,340 780,335 750,335 Z
+                     M 735,365 C 755,365 765,380 765,395 C 765,415 750,422 735,422 C 715,422 705,410 705,392 C 705,372 718,365 735,365 Z" 
+                  fill="url(#berryGrad)" fill-rule="evenodd" />
+            <path d="M 710,360 Q 735,350 755,358" stroke="#FFFFFF" stroke-width="4.5" stroke-linecap="round" fill="none" opacity="0.75" />
+          </g>
+        </g>
+
+        <!-- ============================================ -->
+        <!-- LAYER 4: "MART" SUB-TYPOGRAPHY               -->
+        <!-- ============================================ -->
+        <g id="martGroup" filter="url(#cuteShadow)">
+          <!-- "m" -->
+          <g class="mart-letter">
+            <path id="martM" d="M 392,482 C 392,465 410,460 422,472 C 432,460 450,460 460,472 L 460,515 C 460,524 445,524 445,515 L 445,488 C 442,480 432,480 430,488 L 430,515 C 430,524 415,524 415,515 L 415,488 C 412,480 402,480 400,488 L 400,515 C 400,524 385,524 385,515 L 385,482 Z" fill="url(#berryGrad)" />
+            <ellipse cx="410" cy="475" rx="5" ry="2.5" fill="#FFFFFF" opacity="0.8" />
+            <ellipse cx="442" cy="475" rx="5" ry="2.5" fill="#FFFFFF" opacity="0.8" />
+          </g>
+          
+          <!-- "a" -->
+          <g class="mart-letter">
+            <path id="martA" d="M 495,468 C 476,468 466,482 466,500 C 466,518 480,526 500,526 C 516,526 525,518 528,506 L 528,518 C 528,525 542,525 544,518 L 544,486 C 544,472 532,468 514,468 Z M 504,484 C 516,484 524,492 524,502 C 524,512 516,514 506,514 C 494,514 486,508 486,500 C 486,490 494,484 504,484 Z" fill="url(#berryGrad)" fill-rule="evenodd" />
+            <ellipse cx="508" cy="484" rx="7" ry="2.5" fill="#FFFFFF" opacity="0.75" />
+          </g>
+
+          <!-- "r" -->
+          <g class="mart-letter">
+            <path id="martR" d="M 565,470 C 576,470 582,478 584,490 C 590,474 606,470 616,478 C 620,482 612,492 605,490 C 594,486 584,494 584,506 L 584,518 C 584,525 568,525 568,518 L 568,485 C 568,476 558,475 554,482 C 550,475 556,470 565,470 Z" fill="url(#berryGrad)" />
+            <ellipse cx="598" cy="477" rx="5" ry="2.5" transform="rotate(15 598 477)" fill="#FFFFFF" opacity="0.75" />
+          </g>
+
+          <!-- "t" -->
+          <g class="mart-letter">
+            <path id="martT" d="M 635,455 L 635,468 L 650,468 C 656,468 656,478 650,478 L 635,478 L 635,508 C 635,516 640,520 648,518 C 652,517 654,525 650,528 C 642,534 622,532 622,512 L 622,478 L 612,478 C 606,478 606,468 612,468 L 622,468 L 622,455 C 622,448 635,448 635,455 Z" fill="url(#berryGrad)" />
+            <line x1="626" y1="486" x2="626" y2="505" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" opacity="0.7" />
+          </g>
+        </g>
+
+        <!-- ============================================ -->
+        <!-- LAYER 5: CART WHEELS (Animated Bounce & Roll)-->
+        <!-- ============================================ -->
+        <g id="cartWheelsGroup" filter="url(#cuteShadow)">
+          <!-- Container for dynamic skid puffs / sparks -->
+          <g id="wheelSparksGroup"></g>
+
+          <!-- Left Wheel Wrapper -->
+          <g transform="translate(425, 622)">
+            <g id="wheelLeft">
+              <circle cx="0" cy="0" r="28" fill="url(#wheelGrad)" />
+              <circle cx="0" cy="0" r="21" fill="none" stroke="#A83E52" stroke-width="2" opacity="0.3" />
+              <!-- Rotating Rim Spokes for high-visibility spin -->
+              <line x1="-18" y1="0" x2="18" y2="0" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" opacity="0.65" />
+              <line x1="0" y1="-18" x2="0" y2="18" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" opacity="0.65" />
+              <path d="M -18,-8 A 20 20 0 0 1 8,-18" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.85" />
+              <circle cx="-10" cy="-10" r="3.5" fill="#FFFFFF" opacity="0.9" />
+              <circle cx="0" cy="0" r="8" fill="#FFFFFF" opacity="0.5" />
+              <circle cx="0" cy="0" r="4" fill="#8E2D40" />
+            </g>
+          </g>
+
+          <!-- Right Wheel Wrapper -->
+          <g transform="translate(640, 622)">
+            <g id="wheelRight">
+              <circle cx="0" cy="0" r="28" fill="url(#wheelGrad)" />
+              <circle cx="0" cy="0" r="21" fill="none" stroke="#A83E52" stroke-width="2" opacity="0.3" />
+              <!-- Rotating Rim Spokes for high-visibility spin -->
+              <line x1="-18" y1="0" x2="18" y2="0" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" opacity="0.65" />
+              <line x1="0" y1="-18" x2="0" y2="18" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" opacity="0.65" />
+              <path d="M -18,-8 A 20 20 0 0 1 8,-18" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.85" />
+              <circle cx="-10" cy="-10" r="3.5" fill="#FFFFFF" opacity="0.9" />
+              <circle cx="0" cy="0" r="8" fill="#FFFFFF" opacity="0.5" />
+              <circle cx="0" cy="0" r="4" fill="#8E2D40" />
+            </g>
+          </g>
+        </g>
+
+        <!-- ============================================ -->
+        <!-- LAYER 6: 3 RADIANT SPARKLE RAYS (TOP RIGHT)  -->
+        <!-- ============================================ -->
+        <g id="sparkleRaysGroup">
+          <!-- Left Ray (Slanted Left) -->
+          <g id="ray1" transform="translate(705, 255) rotate(-28)">
+            <ellipse cx="0" cy="0" rx="8" ry="24" fill="url(#berryGrad)" />
+            <ellipse cx="-2" cy="-6" rx="3" ry="10" fill="#FFFFFF" opacity="0.75" />
+          </g>
+
+          <!-- Center Ray (Tall & Upright) -->
+          <g id="ray2" transform="translate(755, 230) rotate(5)">
+            <ellipse cx="0" cy="0" rx="9" ry="32" fill="url(#berryGrad)" />
+            <ellipse cx="-2" cy="-8" rx="3.5" ry="14" fill="#FFFFFF" opacity="0.8" />
+          </g>
+
+          <!-- Right Ray (Slanted Right) -->
+          <g id="ray3" transform="translate(810, 270) rotate(38)">
+            <ellipse cx="0" cy="0" rx="8.5" ry="26" fill="url(#berryGrad)" />
+            <ellipse cx="-2" cy="-6" rx="3" ry="11" fill="#FFFFFF" opacity="0.75" />
+          </g>
+        </g>
+
+        <!-- ============================================ -->
+        <!-- LAYER 7: INTERACTIVE HEARTS CONTAINER        -->
+        <!-- ============================================ -->
+        <g id="floatingHeartsContainer"></g>
+      </svg>
+    </div>
+
+    <!-- Bottom Actions & Entrance CTA -->
+    <footer class="stage-footer">
+      <div class="animation-status" id="animStatus">
+        <span class="status-indicator"></span>
+        <span class="status-text">Playing entrance animation...</span>
+      </div>
+
+      <div class="cta-wrapper">
+        <button id="enterStoreBtn" class="primary-cta pulse-cta">
+          <span>Enter Mayza Mart</span>
+          <span class="arrow">→</span>
+        </button>
+      </div>
+
+      <div class="mascot-tip">
+        <span class="tip-icon">💡</span>
+        <span>Tip: Click on our <strong>Mayza mascots</strong> to see them bounce & toss hearts!</span>
+      </div>
+    </footer>
+  </main>
+
+  <!-- ============================================ -->
+  <!-- MAYZA MART — PIXEL-PERFECT STOREFRONT          -->
+  <!-- Integrated from pixel-perfect-81               -->
+  <!-- ============================================ -->
+  <section class="storefront-preview" id="storefrontPreview" aria-hidden="true">
+    <!-- Top Announcement Strip -->
+    <div class="top-announcement-strip" aria-label="Announcement">
+      <div class="announcement-train-track">
+        <span class="announcement-train-text">✨ Free Express Delivery Across India on Orders Over ₹499 • Welcome to Mayza Mart! 💖 • 🎁 Handpicked Cute Finds &amp; Gifts • 🌸 Handcrafted With Love By 3 Cousins ✨</span>
+        <span class="announcement-train-text">✨ Free Express Delivery Across India on Orders Over ₹499 • Welcome to Mayza Mart! 💖 • 🎁 Handpicked Cute Finds &amp; Gifts • 🌸 Handcrafted With Love By 3 Cousins ✨</span>
+      </div>
+    </div>
+
+    <!-- Header Navigation -->
+    <header class="store-header">
+      <div class="store-header-inner">
+        <a href="#storefrontPreview" class="header-brand-link">
+          <span class="header-brand-icon header-brand-avatar">
+            <img src="mascot.png" alt="Mayza Logo" class="brand-avatar-img">
+          </span>
+          <span class="header-brand-text">
+            <span class="brand-title-main">Mayza</span>
+            <span class="brand-title-script">mart</span>
+            <svg class="brand-cart-svg" viewBox="0 0 110 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <defs>
+                <linearGradient id="navCartGrad" x1="0%" y1="0%" x2="100%" y2="50%">
+                  <stop offset="0%" stop-color="#FF4081" />
+                  <stop offset="50%" stop-color="#E91E63" />
+                  <stop offset="100%" stop-color="#C2185B" />
+                </linearGradient>
+              </defs>
+              <!-- Main thick cart swoosh with rounded ends -->
+              <path d="M 6,8 C 7,19 22,23 52,23 C 80,23 96,18 102,7 C 104,4 100,2 97,5 C 92,11 78,16 52,16 C 26,16 14,13 11,6 C 9,3 5,5 6,8 Z" fill="url(#navCartGrad)" />
+              <!-- Cute little heart at the right tip -->
+              <path d="M 104,4 C 103,1 106,0 107.5,1.5 C 109,0 112,1 111,4 C 110,6 107.5,8 107.5,8 C 107.5,8 105,6 104,4 Z" fill="#FF4081" />
+              <!-- Gloss highlight -->
+              <path d="M 14,9 C 24,14 38,17 52,17 C 70,17 84,13 93,8" stroke="#FFE4EC" stroke-width="1.8" stroke-linecap="round" opacity="0.9" />
+              <!-- Left Wheel with highlight -->
+              <g class="nav-cart-wheel nav-cart-wheel-left">
+                <circle cx="28" cy="25" r="5" fill="url(#navCartGrad)" />
+                <circle cx="28" cy="25" r="3.2" fill="none" stroke="#FFFFFF" stroke-width="0.8" opacity="0.5" />
+                <circle cx="26.5" cy="23.5" r="1.3" fill="#FFFFFF" opacity="0.9" />
+                <circle cx="28" cy="25" r="1" fill="#880E4F" />
+              </g>
+              <!-- Right Wheel with highlight -->
+              <g class="nav-cart-wheel nav-cart-wheel-right">
+                <circle cx="76" cy="25" r="5" fill="url(#navCartGrad)" />
+                <circle cx="76" cy="25" r="3.2" fill="none" stroke="#FFFFFF" stroke-width="0.8" opacity="0.5" />
+                <circle cx="74.5" cy="23.5" r="1.3" fill="#FFFFFF" opacity="0.9" />
+                <circle cx="76" cy="25" r="1" fill="#880E4F" />
+              </g>
+            </svg>
+          </span>
+        </a>
+
+        <nav class="header-nav">
+          <a href="#storefrontPreview" class="nav-link active">Home</a>
+          <a href="#categories" class="nav-link">Shop <span class="nav-chevron">▾</span></a>
+          <a href="#bestsellers" class="nav-link">New Arrivals</a>
+          <a href="#bestsellers" class="nav-link">Best Sellers</a>
+          <a href="#about" class="nav-link">About Us</a>
+          <a href="#footer" class="nav-link">Contact</a>
+        </nav>
+
+        <div class="header-actions">
+          <div class="header-search-wrap">
+            <input type="search" id="storeSearchInput" aria-label="Search products" placeholder="Search for gifts, accessories, home decor..." class="header-search-input">
+            <button class="header-search-btn" aria-label="Search">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+          </div>
+
+          <button class="header-icon-btn mobile-search-btn" aria-label="Search">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
+
+          <button class="header-icon-btn" aria-label="Account" title="Account">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </button>
+
+          <button class="header-icon-btn cart-btn-interactive" id="storeCartBtn" aria-label="Cart" title="Cart">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle>
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+            </svg>
+            <span class="cart-badge-pill" id="cartCountBadge">0</span>
+          </button>
+
+          <button class="replay-entrance-pill" id="returnToAnimBtn" title="Replay Animated Entrance">
+            <span class="replay-icon">↺</span>
+            <span class="replay-text">Entrance</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Store Content Body -->
+    <main class="store-body-wrapper">
+      <!-- ============================================ -->
+      <!-- SECTION 1: HERO (LITTLE JOYS · BIG SMILES)   -->
+      <!-- ============================================ -->
+      <section class="mayza-hero-section">
+        <!-- Top-left and bottom-left background pastel shapes & cute doodles -->
+        <div class="hero-left-decorations" aria-hidden="true">
+          <!-- Background Pastel Organic Clouds (Full Left Height) -->
+          <svg class="hero-pastel-shapes-svg" viewBox="0 0 420 540" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M-30,70 C-30,20 30,-10 75,10 C120,30 105,95 60,115 C15,135 -30,120 -30,70 Z" fill="#D2E3FC" opacity="0.55" />
+            <path d="M-40,170 C-40,115 25,100 60,125 C95,150 105,210 50,235 C0,260 -40,225 -40,170 Z" fill="#FFD7E2" opacity="0.5" />
+            <path d="M-30,270 C-30,230 30,225 65,255 C100,285 85,335 30,335 C-25,335 -30,305 -30,270 Z" fill="#FFF3D6" opacity="0.65" />
+            <path d="M-40,430 C-40,360 20,350 55,385 C90,420 70,480 15,490 C-30,500 -40,470 -40,430 Z" fill="#D2E3FC" opacity="0.45" />
+            <path d="M-30,490 C15,470 70,485 110,515 C70,545 -20,545 -30,510 Z" fill="#FFF3D6" opacity="0.75" />
+          </svg>
+
+          <!-- Floating Doodle Hearts and Twinkling Sparkles -->
+          <svg class="hero-doodles-svg" viewBox="0 0 400 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Top-left purple doodle heart -->
+            <g class="float-doodle doodle-h1" transform="translate(52, 28) rotate(-16)">
+              <path d="M12,4 C8,-2 0,-1 0,6 C0,13 12,20 12,20 C12,20 24,13 24,6 C24,-1 16,-2 12,4 Z" stroke="#B388FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="rgba(179, 136, 255, 0.12)" />
+            </g>
+
+            <!-- Pink doodle heart -->
+            <g class="float-doodle doodle-h2" transform="translate(115, 14) rotate(14)">
+              <path d="M8,3 C5,-1 0,-0.5 0,4.5 C0,9.5 8,15 8,15 C8,15 16,9.5 16,4.5 C16,-0.5 11,-1 8,3 Z" stroke="#FF4081" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="rgba(255, 64, 129, 0.15)" />
+            </g>
+
+            <!-- Golden 4-point twinkle star 1 -->
+            <g class="float-doodle doodle-star1" transform="translate(170, 20)">
+              <path d="M0,-8 Q0,0 8,0 Q0,0 0,8 Q0,0 -8,0 Q0,0 0,-8 Z" fill="#FFA726" />
+            </g>
+
+            <!-- Golden 4-point twinkle star 2 (near Little Joys) -->
+            <g class="float-doodle doodle-star2" transform="translate(245, 38)">
+              <path d="M0,-6 Q0,0 6,0 Q0,0 0,6 Q0,0 -6,0 Q0,0 0,-6 Z" fill="#FFB74D" />
+            </g>
+
+            <!-- Adorable doodle heart near Big Smiles -->
+            <g class="float-doodle doodle-h3" transform="translate(285, 76) rotate(-8)">
+              <path d="M7,2.5 C4.5,-1 0,-0.5 0,4 C0,8 7,13 7,13 C7,13 14,8 14,4 C14,-0.5 9.5,-1 7,2.5 Z" stroke="#FF4081" stroke-width="1.6" stroke-linecap="round" fill="none" />
+            </g>
+
+            <!-- Doodle Star near Shop Now plain area -->
+            <g class="float-doodle doodle-star1" transform="translate(42, 380)">
+              <path d="M0,-8 Q0,0 8,0 Q0,0 0,8 Q0,0 -8,0 Q0,0 0,-8 Z" fill="#FFA726" />
+            </g>
+
+            <!-- Doodle Heart below Shop Now plain area -->
+            <g class="float-doodle doodle-h2" transform="translate(95, 410) rotate(15)">
+              <path d="M9,3.5 C6,-1 0,-0.5 0,5 C0,10 9,16 9,16 C9,16 18,10 18,5 C18,-0.5 12,-1 9,3.5 Z" stroke="#FF4081" stroke-width="1.8" stroke-linecap="round" fill="rgba(255, 64, 129, 0.12)" />
+            </g>
+
+            <!-- Golden star lower corner -->
+            <g class="float-doodle doodle-star2" transform="translate(210, 435)">
+              <path d="M0,-6 Q0,0 6,0 Q0,0 0,6 Q0,0 -6,0 Q0,0 0,-6 Z" fill="#FFB74D" />
+            </g>
+
+            <!-- Playful floating confetti sparkles -->
+            <circle cx="36" cy="65" r="2.5" fill="#FF80AB" opacity="0.75" />
+            <circle cx="92" cy="42" r="2" fill="#B388FF" opacity="0.6" />
+            <circle cx="150" cy="48" r="2.2" fill="#FFD54F" opacity="0.85" />
+            <circle cx="310" cy="36" r="2" fill="#FF80AB" opacity="0.7" />
+            <circle cx="48" cy="110" r="3" fill="#FFD54F" opacity="0.6" />
+            <circle cx="68" cy="350" r="2.5" fill="#B388FF" opacity="0.6" />
+            <circle cx="150" cy="395" r="2.2" fill="#FFD54F" opacity="0.8" />
+            <circle cx="260" cy="420" r="2.5" fill="#FF80AB" opacity="0.7" />
+          </svg>
+        </div>
+
+        <!-- Seamless tabletop photo extending across center and right with left blend -->
+        <div class="hero-backdrop-container" aria-hidden="true">
+          <img src="assets/hero-products.jpg" alt="" class="hero-backdrop-img">
+        </div>
+
+        <div class="mayza-hero-grid">
+          <!-- Left Hero Content -->
+          <div class="hero-content-col">
+            <p class="hero-script-tag">Little Joys · Big Smiles ♡</p>
+            <h1 class="hero-title-main">Gifts • Accessories • Essentials</h1>
+            <p class="hero-title-script">for Everyone ♡</p>
+            <p class="hero-description">
+              From cute kids' goodies to stylish accessories,<br>
+              home essentials and thoughtful gifts —<br>
+              find something special for every age<br>
+              and every occasion!
+            </p>
+            <div class="hero-cta-group">
+              <a href="#bestsellers" class="hero-shop-btn sparkle-btn">
+                <span class="btn-sparkle-star btn-sparkle-tl">✦</span>
+                <span class="btn-text">Shop Now</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                <span class="btn-sparkle-star btn-sparkle-br">✦</span>
+                <span class="btn-shimmer-sweep" aria-hidden="true"></span>
+              </a>
+              <!-- Decorative floating doodle star & heart beside Shop Now -->
+              <div class="shop-btn-decorations" aria-hidden="true">
+                <svg width="95" height="42" viewBox="0 0 95 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <!-- Golden star -->
+                  <g class="float-doodle doodle-star1" transform="translate(16, 18)">
+                    <path d="M0,-8 Q0,0 8,0 Q0,0 0,8 Q0,0 -8,0 Q0,0 0,-8 Z" fill="#FFA726" />
+                  </g>
+                  <!-- Soft pink doodle heart -->
+                  <g class="float-doodle doodle-h2" transform="translate(54, 22) rotate(12)">
+                    <path d="M7,2.5 C4.5,-1 0,-0.5 0,4 C0,8 7,13 7,13 C7,13 14,8 14,4 C14,-0.5 9.5,-1 7,2.5 Z" stroke="#FF4081" stroke-width="1.6" fill="rgba(255, 64, 129, 0.15)" />
+                  </g>
+                  <!-- Twinkle dots -->
+                  <circle cx="82" cy="14" r="2.2" fill="#FFD54F" opacity="0.85" />
+                  <circle cx="34" cy="32" r="1.8" fill="#FF80AB" opacity="0.75" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Center Tabletop Clear Visual Spacer -->
+          <div class="hero-center-spacer" aria-hidden="true"></div>
+
+          <!-- Right Hero Occasion Card -->
+          <div class="hero-occasion-col">
+            <div class="occasion-content-panel">
+              <p class="occasion-script-title">For Every<br>Occasion ♡</p>
+              <ul class="occasion-list">
+                <li><span class="heart-dot">♥</span> Birthdays</li>
+                <li><span class="heart-dot">♥</span> Weddings</li>
+                <li><span class="heart-dot">♥</span> Return Gifts</li>
+                <li><span class="heart-dot">♥</span> Festivals</li>
+                <li><span class="heart-dot">♥</span> Just Because</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero Bottom Trust Strip (Clean Plain Space Across Bottom) -->
+        <div class="hero-bottom-trust-strip">
+          <ul class="hero-trust-list">
+            <li class="trust-item">
+              <span class="trust-icon-svg" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 12 20 22 4 22 4 12"></polyline>
+                  <rect x="2" y="7" width="20" height="5"></rect>
+                  <line x1="12" y1="22" x2="12" y2="7"></line>
+                  <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+                  <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+                </svg>
+              </span>
+              <span>Unique &amp; Trendy Collections</span>
+            </li>
+            <li class="trust-item">
+              <span class="trust-icon-svg" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="1" y="3" width="15" height="13"></rect>
+                  <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                  <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                  <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                </svg>
+              </span>
+              <span>Fast &amp; Reliable Delivery</span>
+            </li>
+            <li class="trust-item">
+              <span class="trust-icon-svg" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  <polyline points="9 11 11 13 15 9"></polyline>
+                </svg>
+              </span>
+              <span>Secure Payments</span>
+            </li>
+            <li class="trust-item">
+              <span class="trust-icon-svg" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                </svg>
+              </span>
+              <span>Quality Products You'll Love</span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ============================================ -->
+      <!-- SECTION 2: CATEGORY BAR & BENEFITS           -->
+      <!-- ============================================ -->
+      <section class="mayza-category-bar-section" id="categoryBarSection">
+        <h2 class="category-section-title">Shop by category</h2>
+        <!-- Horizontal Scrollable Glass Ribbon -->
+        <div class="glass-category-strip no-scrollbar">
+          <a href="#categories" class="cat-pill-btn">
+            <span class="cat-icon-circle bg-sec">🎁</span>
+            <span class="cat-label">Return Gifts</span>
+          </a>
+          <a href="#categories" class="cat-pill-btn">
+            <span class="cat-icon-circle bg-acc">🎀</span>
+            <span class="cat-label">Hair Accessories</span>
+          </a>
+          <a href="#categories" class="cat-pill-btn">
+            <span class="cat-icon-circle bg-lav">🌸</span>
+            <span class="cat-label">Clips &amp; Hair Bands</span>
+          </a>
+          <a href="#categories" class="cat-pill-btn">
+            <span class="cat-icon-circle bg-sec">🛍️</span>
+            <span class="cat-label">Handbags &amp; Purses</span>
+          </a>
+          <a href="#categories" class="cat-pill-btn">
+            <span class="cat-icon-circle bg-sky">🧸</span>
+            <span class="cat-label">Toys</span>
+          </a>
+          <a href="#categories" class="cat-pill-btn">
+            <span class="cat-icon-circle bg-lav">✏️</span>
+            <span class="cat-label">Stationery</span>
+          </a>
+          <a href="#categories" class="cat-pill-btn">
+            <span class="cat-icon-circle bg-pea">🏠</span>
+            <span class="cat-label">Home &amp; Lifestyle</span>
+          </a>
+          <a href="#categories" class="cat-pill-btn">
+            <span class="cat-icon-circle bg-acc">💎</span>
+            <span class="cat-label">Jewellery &amp; Fashion</span>
+          </a>
+          <a href="#categories" class="cat-pill-btn">
+            <span class="cat-icon-circle bg-sky">📱</span>
+            <span class="cat-label">Phone Accessories</span>
+          </a>
+          <a href="#categories" class="cat-pill-btn">
+            <span class="cat-icon-circle bg-sec">✨</span>
+            <span class="cat-label">More</span>
+          </a>
+        </div>
+
+        <!-- 4 Service Benefits Grid -->
+        <div class="benefits-strip-grid">
+          <div class="benefit-item">
+            <span class="benefit-icon-box">🚚</span>
+            <div class="benefit-text">
+              <span class="benefit-title">Fast &amp; Reliable Delivery</span>
+              <span class="benefit-sub">Across India</span>
+            </div>
+          </div>
+          <div class="benefit-item">
+            <span class="benefit-icon-box">🛡️</span>
+            <div class="benefit-text">
+              <span class="benefit-title">Secure Payments</span>
+              <span class="benefit-sub">Multiple options</span>
+            </div>
+          </div>
+          <div class="benefit-item">
+            <span class="benefit-icon-box">💖</span>
+            <div class="benefit-text">
+              <span class="benefit-title">Curated with Love</span>
+              <span class="benefit-sub">For every occasion</span>
+            </div>
+          </div>
+          <div class="benefit-item">
+            <span class="benefit-icon-box">🎁</span>
+            <div class="benefit-text">
+              <span class="benefit-title">Perfect for Gifting</span>
+              <span class="benefit-sub">Because every moment matters</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================ -->
+      <!-- SECTION 3: CATEGORY GRID                     -->
+      <!-- ============================================ -->
+      <section id="categories" class="mayza-category-grid-section">
+        <div class="category-main-grid-layout">
+          <div class="category-cards-wrap">
+            <div class="section-heading-row">
+              <div>
+                <h2 class="section-title-script">Explore Our Categories ♡</h2>
+                <p class="section-subtitle">Thoughtful finds for every mood, age and occasion</p>
+              </div>
+              <a href="#categories" class="view-all-pill-btn">
+                <span>View All Categories</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </a>
+            </div>
+
+            <div class="category-cards-grid">
+              <a href="#bestsellers" class="cat-product-card">
+                <div class="cat-card-media">
+                  <img src="assets/cat-return-gifts.jpg" alt="Return Gifts" loading="lazy">
+                  <span class="cat-card-arrow">➔</span>
+                </div>
+                <div class="cat-card-info">
+                  <h3>Return Gifts</h3>
+                  <p>Make it memorable</p>
+                </div>
+              </a>
+              <a href="#bestsellers" class="cat-product-card">
+                <div class="cat-card-media">
+                  <img src="assets/cat-hair.jpg" alt="Hair Accessories" loading="lazy">
+                  <span class="cat-card-arrow">➔</span>
+                </div>
+                <div class="cat-card-info">
+                  <h3>Hair Accessories</h3>
+                  <p>Style in every strand</p>
+                </div>
+              </a>
+              <a href="#bestsellers" class="cat-product-card">
+                <div class="cat-card-media">
+                  <img src="assets/cat-bags.jpg" alt="Handbags & Purses" loading="lazy">
+                  <span class="cat-card-arrow">➔</span>
+                </div>
+                <div class="cat-card-info">
+                  <h3>Handbags &amp; Purses</h3>
+                  <p>Carry your style</p>
+                </div>
+              </a>
+              <a href="#bestsellers" class="cat-product-card">
+                <div class="cat-card-media">
+                  <img src="assets/cat-toys.jpg" alt="Toys" loading="lazy">
+                  <span class="cat-card-arrow">➔</span>
+                </div>
+                <div class="cat-card-info">
+                  <h3>Toys</h3>
+                  <p>Fun for all ages</p>
+                </div>
+              </a>
+              <a href="#bestsellers" class="cat-product-card">
+                <div class="cat-card-media">
+                  <img src="assets/cat-stationery.jpg" alt="Stationery" loading="lazy">
+                  <span class="cat-card-arrow">➔</span>
+                </div>
+                <div class="cat-card-info">
+                  <h3>Stationery</h3>
+                  <p>Write • Create • Dream</p>
+                </div>
+              </a>
+              <a href="#bestsellers" class="cat-product-card">
+                <div class="cat-card-media">
+                  <img src="assets/cat-home.jpg" alt="Home & Lifestyle" loading="lazy">
+                  <span class="cat-card-arrow">➔</span>
+                </div>
+                <div class="cat-card-info">
+                  <h3>Home &amp; Lifestyle</h3>
+                  <p>Make it cozy</p>
+                </div>
+              </a>
+              <a href="#bestsellers" class="cat-product-card">
+                <div class="cat-card-media">
+                  <img src="assets/cat-jewellery.jpg" alt="Jewellery & Fashion" loading="lazy">
+                  <span class="cat-card-arrow">➔</span>
+                </div>
+                <div class="cat-card-info">
+                  <h3>Jewellery &amp; Fashion</h3>
+                  <p>Accessorize your style</p>
+                </div>
+              </a>
+              <a href="#bestsellers" class="cat-product-card">
+                <div class="cat-card-media">
+                  <img src="assets/cat-party.jpg" alt="Party Supplies" loading="lazy">
+                  <span class="cat-card-arrow">➔</span>
+                </div>
+                <div class="cat-card-info">
+                  <h3>Party Supplies</h3>
+                  <p>Celebrate in style</p>
+                </div>
+              </a>
+              <a href="#bestsellers" class="cat-product-card">
+                <div class="cat-card-media">
+                  <img src="assets/cat-phone.jpg" alt="Phone Accessories" loading="lazy">
+                  <span class="cat-card-arrow">➔</span>
+                </div>
+                <div class="cat-card-info">
+                  <h3>Phone Accessories</h3>
+                  <p>Stay connected</p>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <!-- Side Promo Banner -->
+          <aside class="category-side-promo">
+            <p class="side-promo-script">Perfect Gifts for Every Occasion ♡</p>
+            <span class="side-promo-gift-icon">🎁</span>
+            <a href="#bestsellers" class="side-promo-shop-btn">
+              <span>Shop Now</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </a>
+            <ul class="side-promo-occasions">
+              <li><span class="heart-bullet">♥</span> Birthdays</li>
+              <li><span class="heart-bullet">♥</span> Anniversaries</li>
+              <li><span class="heart-bullet">♥</span> Festivals</li>
+              <li><span class="heart-bullet">♥</span> Corporate Gifts</li>
+              <li><span class="heart-bullet">♥</span> Just Because</li>
+            </ul>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============================================ -->
+      <!-- SECTION 4: BEST SELLERS                      -->
+      <!-- ============================================ -->
+      <section id="bestsellers" class="mayza-bestsellers-section">
+        <div class="bestsellers-main-layout">
+          <div class="bestsellers-cards-wrap">
+            <div class="section-heading-row">
+              <div class="bestsellers-heading-lockup">
+                <span class="crown-icon">👑</span>
+                <div>
+                  <h2 class="section-title-script">Best Sellers</h2>
+                  <p class="section-subtitle">Loved by many, picked by us!</p>
+                </div>
+              </div>
+              <a href="#bestsellers" class="view-all-pill-btn">
+                <span>View All</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </a>
+            </div>
+
+            <div class="bestsellers-products-grid">
+              <!-- Product 1 -->
+              <article class="product-item-card" data-name="Cute Hair Clips Set (Pack of 12)">
+                <div class="prod-card-media">
+                  <img src="assets/p-clips.jpg" alt="Cute Hair Clips Set" loading="lazy">
+                  <span class="prod-badge-pill">Best Seller</span>
+                  <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
+                </div>
+                <div class="prod-card-info">
+                  <h3 class="prod-name-title">Cute Hair Clips Set (Pack of 12)</h3>
+                  <p class="prod-price-text">₹249</p>
+                  <p class="prod-rating-score">★ 4.8</p>
+                  <button class="add-to-cart-action-btn" aria-label="Add to cart">
+                    <span>🛒</span> Add to Cart
+                  </button>
+                </div>
+              </article>
+
+              <!-- Product 2 -->
+              <article class="product-item-card" data-name="Unicorn Return Gift Box (Set of 5)">
+                <div class="prod-card-media">
+                  <img src="assets/p-giftbox.jpg" alt="Unicorn Return Gift Box" loading="lazy">
+                  <span class="prod-badge-pill">Best Seller</span>
+                  <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
+                </div>
+                <div class="prod-card-info">
+                  <h3 class="prod-name-title">Unicorn Return Gift Box (Set of 5)</h3>
+                  <p class="prod-price-text">₹299</p>
+                  <p class="prod-rating-score">★ 4.7</p>
+                  <button class="add-to-cart-action-btn" aria-label="Add to cart">
+                    <span>🛒</span> Add to Cart
+                  </button>
+                </div>
+              </article>
+
+              <!-- Product 3 -->
+              <article class="product-item-card" data-name="Mini Handbag (Kids & Teens)">
+                <div class="prod-card-media">
+                  <img src="assets/p-handbag.jpg" alt="Mini Handbag" loading="lazy">
+                  <span class="prod-badge-pill badge-new">New</span>
+                  <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
+                </div>
+                <div class="prod-card-info">
+                  <h3 class="prod-name-title">Mini Handbag (Kids &amp; Teens)</h3>
+                  <p class="prod-price-text">₹349</p>
+                  <p class="prod-rating-score">★ 4.6</p>
+                  <button class="add-to-cart-action-btn" aria-label="Add to cart">
+                    <span>🛒</span> Add to Cart
+                  </button>
+                </div>
+              </article>
+
+              <!-- Product 4 -->
+              <article class="product-item-card" data-name="Scented Candle Gift Set">
+                <div class="prod-card-media">
+                  <img src="assets/p-candle.jpg" alt="Scented Candle Gift Set" loading="lazy">
+                  <span class="prod-badge-pill">Best Seller</span>
+                  <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
+                </div>
+                <div class="prod-card-info">
+                  <h3 class="prod-name-title">Scented Candle Gift Set</h3>
+                  <p class="prod-price-text">₹499</p>
+                  <p class="prod-rating-score">★ 4.8</p>
+                  <button class="add-to-cart-action-btn" aria-label="Add to cart">
+                    <span>🛒</span> Add to Cart
+                  </button>
+                </div>
+              </article>
+
+              <!-- Product 5 -->
+              <article class="product-item-card" data-name="Designer Scrunchies (Set of 5)">
+                <div class="prod-card-media">
+                  <img src="assets/p-scrunchies.jpg" alt="Designer Scrunchies" loading="lazy">
+                  <span class="prod-badge-pill">Best Seller</span>
+                  <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
+                </div>
+                <div class="prod-card-info">
+                  <h3 class="prod-name-title">Designer Scrunchies (Set of 5)</h3>
+                  <p class="prod-price-text">₹199</p>
+                  <p class="prod-rating-score">★ 4.7</p>
+                  <button class="add-to-cart-action-btn" aria-label="Add to cart">
+                    <span>🛒</span> Add to Cart
+                  </button>
+                </div>
+              </article>
+
+              <!-- Product 6 -->
+              <article class="product-item-card" data-name="Cute Water Bottle (500ml)">
+                <div class="prod-card-media">
+                  <img src="assets/p-bottle.jpg" alt="Cute Water Bottle" loading="lazy">
+                  <span class="prod-badge-pill badge-new">New</span>
+                  <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
+                </div>
+                <div class="prod-card-info">
+                  <h3 class="prod-name-title">Cute Water Bottle (500ml)</h3>
+                  <p class="prod-price-text">₹299</p>
+                  <p class="prod-rating-score">★ 4.6</p>
+                  <button class="add-to-cart-action-btn" aria-label="Add to cart">
+                    <span>🛒</span> Add to Cart
+                  </button>
+                </div>
+              </article>
+
+              <!-- Product 7 -->
+              <article class="product-item-card" data-name="Stationery Set (Unicorn Theme)">
+                <div class="prod-card-media">
+                  <img src="assets/cat-stationery.jpg" alt="Stationery Set" loading="lazy">
+                  <span class="prod-badge-pill">Best Seller</span>
+                  <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
+                </div>
+                <div class="prod-card-info">
+                  <h3 class="prod-name-title">Stationery Set (Unicorn Theme)</h3>
+                  <p class="prod-price-text">₹349</p>
+                  <p class="prod-rating-score">★ 4.8</p>
+                  <button class="add-to-cart-action-btn" aria-label="Add to cart">
+                    <span>🛒</span> Add to Cart
+                  </button>
+                </div>
+              </article>
+
+              <!-- Product 8 -->
+              <article class="product-item-card" data-name="Teddy Bear (Small)">
+                <div class="prod-card-media">
+                  <img src="assets/cat-toys.jpg" alt="Teddy Bear" loading="lazy">
+                  <span class="prod-badge-pill">Best Seller</span>
+                  <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
+                </div>
+                <div class="prod-card-info">
+                  <h3 class="prod-name-title">Teddy Bear (Small)</h3>
+                  <p class="prod-price-text">₹399</p>
+                  <p class="prod-rating-score">★ 4.9</p>
+                  <button class="add-to-cart-action-btn" aria-label="Add to cart">
+                    <span>🛒</span> Add to Cart
+                  </button>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <!-- Bestsellers Side Banner -->
+          <aside class="bestsellers-side-banner">
+            <p class="side-banner-script">
+              Small Things<br>
+              <span class="text-secondary-foreground">Make</span><br>
+              Big Happiness ♡
+            </p>
+            <div class="side-banner-heart-visual">
+              <span class="large-heart-icon">♥</span>
+            </div>
+            <p class="side-banner-subtext">
+              Curated little joys, wrapped with care and ready to gift.
+            </p>
+            <div class="side-banner-coupon">
+              <span class="coupon-tag">Special Welcome Perk</span>
+              <span class="coupon-code">Use Code: <strong>MAYZAJOY</strong></span>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ============================================ -->
+      <!-- SECTION 5: FOOTER (SHOP SMART · GIFT BETTER) -->
+      <!-- ============================================ -->
+      <footer id="footer" class="mayza-footer-section">
+        <div class="footer-promises-strip">
+          <span class="promise-item"><span class="promise-icon">🛍️</span> Shop Smart</span>
+          <span class="promise-item"><span class="promise-icon">😊</span> Gift Better</span>
+          <span class="promise-item"><span class="promise-icon">⭐</span> Live Happier</span>
+        </div>
+
+        <div class="footer-cousins-highlight">
+          <span>💖 Founded with love by 3 cousins: <strong>Mauji • Aynul • Faiza</strong></span>
+        </div>
+
+        <div class="footer-copyright-bar">
+          <p>Made with <span class="heart-inline">♥</span> by Mayza mart — gifts, accessories and essentials for everyone.</p>
+          <p class="footer-sub-bar">© 2026 Mayza Mart. All rights reserved • 🇮🇳 Shipping Across India • 🔒 100% Secure Checkout</p>
+        </div>
+      </footer>
+    </main>
+
+    <!-- ============================================ -->
+    <!-- TRAVELING MASCOT GIRL (SCROLL COMPANION)     -->
+    <!-- ============================================ -->
+    <div class="traveling-mascot-companion" id="travelingMascot" aria-label="Mayza Store Guide" title="Click to fly back to top!">
+      <!-- Speech Bubble that changes dynamically per section -->
+      <div class="travel-speech-bubble" id="mascotSpeechBubble">
+        <span class="bubble-text" id="mascotBubbleText">Welcome to Mayza! 💖</span>
+        <span class="bubble-tail"></span>
+      </div>
+
+      <!-- Mascot Character riding a cute pastel shopping cloud -->
+      <div class="mascot-avatar-wrapper" id="mascotAvatarTrigger">
+        <!-- Floating Fairy Cloud Base -->
+        <div class="mascot-cloud-base" aria-hidden="true">
+          <svg width="86" height="38" viewBox="0 0 86 38" fill="none">
+            <path d="M14,26 C9,26 4,21 4,16 C4,11 9,7 16,8 C18,3 25,0 32,2 C39,4 42,10 43,13 C47,8 55,7 61,10 C68,13 70,20 68,24 C75,24 81,27 81,31 C81,35 75,37 68,37 L18,37 C11,37 7,33 7,28 Z" fill="url(#cloudGrad)" />
+            <!-- Cloud sparkles -->
+            <circle cx="22" cy="24" r="1.8" fill="#FFFFFF" opacity="0.9" />
+            <circle cx="50" cy="26" r="2.2" fill="#FFFFFF" opacity="0.8" />
+            <circle cx="70" cy="30" r="1.4" fill="#FFFFFF" opacity="0.9" />
+            <defs>
+              <linearGradient id="cloudGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FFE4EC" />
+                <stop offset="50%" stop-color="#FFF0F5" />
+                <stop offset="100%" stop-color="#FFD1DC" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        <!-- Mascot Girl Illustration -->
+        <div class="mascot-girl-figure">
+          <img src="mascot.png" alt="Mayza Mascot Girl" class="mascot-travel-img">
+        </div>
+
+        <!-- Magic Sparkle Wand & Heart -->
+        <span class="mascot-sparkle-star mascot-sparkle-1">✦</span>
+        <span class="mascot-sparkle-star mascot-sparkle-2">💖</span>
+      </div>
+
+      <!-- Little Return to Top hint on hover -->
+      <div class="mascot-tap-hint">Tap to fly top ⬆</div>
+    </div>
+
+    <!-- Floating Interactive Add to Cart Toast Notification -->
+    <div class="cart-toast-toast" id="cartToast" aria-live="polite">
+      <span class="toast-icon">🛍️</span>
+      <span class="toast-text" id="toastMessage">Added to your cart!</span>
+    </div>
+  </section>
+
+
+  <!-- Script logic -->
+  <script src="app.js"></script>
+</body>
+</html>
