@@ -339,13 +339,11 @@ class MayzaEntranceApp {
       this.introOverlay.classList.add('dismissed');
       setTimeout(() => {
         this.introOverlay.style.display = 'none';
-      }, 600);
+      }, 300);
     }
 
-    // Play main animation timeline from second 0 with full sound!
-    setTimeout(() => {
-      this.mainTimeline.restart();
-    }, 100);
+    // Enter directly into Mayza Mart Wonderland Storefront!
+    this.enterStore();
   }
 
   setupAnimation() {
@@ -714,15 +712,28 @@ class MayzaEntranceApp {
   enterStore() {
     this.isEntered = true;
     this.sound.playSparkleChime();
+    this.celebrateConfetti();
 
-    // Smooth transition
-    this.stageContainer.classList.add('fade-out');
+    if (this.introOverlay) {
+      this.introOverlay.classList.add('dismissed');
+      this.introOverlay.style.display = 'none';
+    }
 
-    setTimeout(() => {
-      this.stageContainer.style.display = 'none';
+    if (this.stageContainer) {
+      this.stageContainer.classList.add('fade-out');
+      setTimeout(() => {
+        this.stageContainer.style.display = 'none';
+      }, 300);
+    }
+
+    if (this.storefrontPreview) {
       this.storefrontPreview.classList.add('active');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 600);
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Refresh live announcement banner and active coupons from Supabase
+    this.syncLiveBannersAndCoupons();
   }
 
   initStorefrontInteractions() {
@@ -855,6 +866,7 @@ class MayzaEntranceApp {
         } catch (err) {}
       }
     });
+  }
 
   // =========================================================
   // CUSTOMER AUTH & DASHBOARD ORCHESTRATION
