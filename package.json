@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Mayza Mart Storefront & Wonderland Studio Admin",
   "scripts": {
+    "build": "echo 'Static build ready'",
     "dev": "node local-server.js"
   }
 }
