@@ -1190,7 +1190,10 @@
         </div>
 
         <div class="auth-input-group">
-          <label for="loginPasswordInput">Password</label>
+          <div class="auth-label-row">
+            <label for="loginPasswordInput">Password</label>
+            <button type="button" class="auth-forgot-link" id="openForgotPwBtn">Forgot password?</button>
+          </div>
           <div class="auth-input-field-wrap">
             <span class="auth-field-icon">🔒</span>
             <input type="password" id="loginPasswordInput" class="auth-input-control" placeholder="••••••••" required autocomplete="current-password">
@@ -1241,7 +1244,7 @@
             <label for="regPasswordInput">Create Password</label>
             <div class="auth-input-field-wrap">
               <span class="auth-field-icon">🔒</span>
-              <input type="password" id="regPasswordInput" class="auth-input-control" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password">
+              <input type="password" id="regPasswordInput" class="auth-input-control" placeholder="At least 6 characters" minlength="6" autocomplete="new-password">
             </div>
           </div>
         </div>
@@ -1264,6 +1267,80 @@
         <div class="auth-switch-prompt">
           <span>Already have an account?</span>
           <button type="button" class="auth-switch-link" id="switchToLoginBtn">Sign in here</button>
+        </div>
+      </form>
+
+      <!-- Forgot / Reset Password Form -->
+      <form id="customerForgotForm" class="customer-auth-form" style="display:none;">
+        <div class="auth-forgot-header">
+          <button type="button" class="auth-back-btn" id="backToLoginFromForgotBtn" aria-label="Back to sign in">
+            <span>← Back to Sign In</span>
+          </button>
+          <span class="auth-forgot-badge">🔒 Password Recovery</span>
+        </div>
+
+        <!-- Step 1: Request Reset Code -->
+        <div id="forgotStep1" class="auth-forgot-step">
+          <p class="auth-forgot-desc">Enter your registered email address to receive a secure 6-digit recovery code.</p>
+          <div class="auth-input-group">
+            <label for="forgotEmailInput">Registered Email</label>
+            <div class="auth-input-field-wrap">
+              <span class="auth-field-icon">✉️</span>
+              <input type="email" id="forgotEmailInput" class="auth-input-control" placeholder="yourname@gmail.com" autocomplete="email">
+            </div>
+          </div>
+
+          <p class="auth-feedback-msg" id="forgotStep1FeedbackMsg"></p>
+
+          <button type="button" class="auth-primary-submit-btn" id="sendResetCodeBtn">
+            <span>Send Recovery Code</span>
+            <span class="btn-arrow">✉️</span>
+          </button>
+        </div>
+
+        <!-- Step 2: Verification Code & New Password -->
+        <div id="forgotStep2" class="auth-forgot-step" style="display:none;">
+          <div class="auth-code-notice">
+            <span>Code sent to: <strong id="forgotSentEmailDisplay"></strong></span>
+            <button type="button" class="auth-resend-link" id="resendResetCodeBtn">Resend Code</button>
+          </div>
+
+          <div class="auth-input-group">
+            <label for="forgotOtpInput">6-Digit Recovery Code</label>
+            <div class="auth-input-field-wrap">
+              <span class="auth-field-icon">🔑</span>
+              <input type="text" id="forgotOtpInput" class="auth-input-control auth-code-input" placeholder="123456" maxlength="6" inputmode="numeric">
+            </div>
+          </div>
+
+          <div class="auth-input-group">
+            <label for="forgotNewPassInput">New Password</label>
+            <div class="auth-input-field-wrap">
+              <span class="auth-field-icon">🔒</span>
+              <input type="password" id="forgotNewPassInput" class="auth-input-control" placeholder="At least 6 characters" minlength="6" autocomplete="new-password">
+              <button type="button" class="auth-pw-toggle" id="toggleForgotNewPwBtn" aria-label="Toggle password">👁️</button>
+            </div>
+          </div>
+
+          <div class="auth-input-group">
+            <label for="forgotConfirmPassInput">Confirm New Password</label>
+            <div class="auth-input-field-wrap">
+              <span class="auth-field-icon">✅</span>
+              <input type="password" id="forgotConfirmPassInput" class="auth-input-control" placeholder="Re-enter new password" minlength="6" autocomplete="new-password">
+            </div>
+          </div>
+
+          <p class="auth-feedback-msg" id="forgotStep2FeedbackMsg"></p>
+
+          <button type="submit" class="auth-primary-submit-btn" id="resetPasswordSubmitBtn">
+            <span>Save New Password &amp; Continue</span>
+            <span class="btn-arrow">➔</span>
+          </button>
+        </div>
+
+        <div class="auth-switch-prompt">
+          <span>Remember your password?</span>
+          <button type="button" class="auth-switch-link" id="switchToLoginFromForgotLink">Sign in here</button>
         </div>
       </form>
     </div>

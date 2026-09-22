@@ -720,6 +720,85 @@
       return { success: false, message: 'No account found with this email. Please create an account first!' };
     }
 
+    async checkCustomerEmailExists(email) {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      if (!cleanEmail) return { exists: false, message: 'Please enter an email address.' };
+
+      // Check cloud database
+      if (this.isConfigured()) {
+        try {
+          const { data, error } = await this.client
+            .from('customers')
+            .select('id, name, email')
+            .eq('email', cleanEmail)
+            .limit(1);
+
+          if (!error && data && data.length > 0) {
+            return { exists: true, name: data[0].name, email: data[0].email };
+          }
+        } catch (err) {
+          console.warn('[Supabase] checkCustomerEmailExists error:', err);
+        }
+      }
+
+      // Check local storage fallback
+      try {
+        const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
+        const found = localCusts.find(c => (c.email || '').toLowerCase() === cleanEmail);
+        if (found) {
+          return { exists: true, name: found.name, email: found.email };
+        }
+      } catch (e) {}
+
+      return { exists: false, message: 'No registered account found with this email address.' };
+    }
+
+    async resetCustomerPassword({ email, newPassword }) {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      if (!cleanEmail) return { success: false, message: 'Email address is required.' };
+      if (!newPassword || newPassword.length < 6) {
+        return { success: false, message: 'New password must be at least 6 characters long.' };
+      }
+
+      let updatedInCloud = false;
+      let updatedInLocal = false;
+
+      // Update in Supabase
+      if (this.isConfigured()) {
+        try {
+          const { error } = await this.client
+            .from('customers')
+            .update({ password: newPassword })
+            .eq('email', cleanEmail);
+
+          if (!error) {
+            updatedInCloud = true;
+          } else {
+            console.warn('[Supabase] resetCustomerPassword cloud update error:', error.message);
+          }
+        } catch (err) {
+          console.warn('[Supabase] resetCustomerPassword cloud error:', err);
+        }
+      }
+
+      // Update in localStorage
+      try {
+        const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
+        const idx = localCusts.findIndex(c => (c.email || '').toLowerCase() === cleanEmail);
+        if (idx !== -1) {
+          localCusts[idx].password = newPassword;
+          localStorage.setItem('mm_local_customers', JSON.stringify(localCusts));
+          updatedInLocal = true;
+        }
+      } catch (e) {}
+
+      if (updatedInCloud || updatedInLocal) {
+        return { success: true, message: 'Password has been successfully reset! You can now sign in.' };
+      }
+
+      return { success: false, message: 'Account could not be found to update password.' };
+    }
+
     async updateCustomerProfile(updatedData) {
       const current = this.getCurrentCustomer();
       if (!current) return { success: false, message: 'Not signed in' };

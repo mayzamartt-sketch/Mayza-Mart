@@ -1023,10 +1023,51 @@ class MayzaEntranceApp {
     // Tab buttons in Auth Modal
     const tabLogin = document.getElementById('authTabLogin');
     const tabRegister = document.getElementById('authTabRegister');
+    const authTabsWrap = document.querySelector('.customer-auth-tabs');
     const formLogin = document.getElementById('customerLoginForm');
     const formRegister = document.getElementById('customerRegisterForm');
     const switchToReg = document.getElementById('switchToRegisterBtn');
     const switchToLog = document.getElementById('switchToLoginBtn');
+
+    // Forgot Password elements
+    const openForgotBtn = document.getElementById('openForgotPwBtn');
+    const formForgot = document.getElementById('customerForgotForm');
+    const backToLoginForgotBtn = document.getElementById('backToLoginFromForgotBtn');
+    const switchToLoginFromForgotLink = document.getElementById('switchToLoginFromForgotLink');
+    const forgotStep1 = document.getElementById('forgotStep1');
+    const forgotStep2 = document.getElementById('forgotStep2');
+    const forgotEmailInput = document.getElementById('forgotEmailInput');
+    const sendResetCodeBtn = document.getElementById('sendResetCodeBtn');
+    const forgotStep1Feedback = document.getElementById('forgotStep1FeedbackMsg');
+    const forgotSentEmailDisplay = document.getElementById('forgotSentEmailDisplay');
+    const resendResetCodeBtn = document.getElementById('resendResetCodeBtn');
+    const forgotOtpInput = document.getElementById('forgotOtpInput');
+    const forgotNewPassInput = document.getElementById('forgotNewPassInput');
+    const forgotConfirmPassInput = document.getElementById('forgotConfirmPassInput');
+    const toggleForgotNewPwBtn = document.getElementById('toggleForgotNewPwBtn');
+    const forgotStep2Feedback = document.getElementById('forgotStep2FeedbackMsg');
+    const resetPasswordSubmitBtn = document.getElementById('resetPasswordSubmitBtn');
+
+    let recoveryState = {
+      activeEmail: '',
+      generatedCode: '',
+      codeExpiry: 0
+    };
+
+    const showForgotStep = (step) => {
+      if (forgotStep1Feedback) forgotStep1Feedback.textContent = '';
+      if (forgotStep2Feedback) forgotStep2Feedback.textContent = '';
+      if (step === 2) {
+        if (forgotStep1) forgotStep1.style.display = 'none';
+        if (forgotStep2) forgotStep2.style.display = 'block';
+        if (forgotSentEmailDisplay) forgotSentEmailDisplay.textContent = recoveryState.activeEmail;
+        setTimeout(() => forgotOtpInput?.focus(), 150);
+      } else {
+        if (forgotStep1) forgotStep1.style.display = 'block';
+        if (forgotStep2) forgotStep2.style.display = 'none';
+        setTimeout(() => forgotEmailInput?.focus(), 150);
+      }
+    };
 
     // Forms & inputs
     const togglePw = document.getElementById('toggleLoginPwBtn');
@@ -1055,18 +1096,34 @@ class MayzaEntranceApp {
 
     // Tab switching in Auth modal
     const setAuthTab = (tab) => {
+      if (loginFeedback) loginFeedback.textContent = '';
+      if (regFeedback) regFeedback.textContent = '';
+      if (forgotStep1Feedback) forgotStep1Feedback.textContent = '';
+      if (forgotStep2Feedback) forgotStep2Feedback.textContent = '';
+
       if (tab === 'register') {
+        if (authTabsWrap) authTabsWrap.style.display = 'flex';
         tabRegister?.classList.add('active');
         tabLogin?.classList.remove('active');
         if (formRegister) formRegister.style.display = 'flex';
         if (formLogin) formLogin.style.display = 'none';
-        if (regFeedback) regFeedback.textContent = '';
+        if (formForgot) formForgot.style.display = 'none';
+      } else if (tab === 'forgot') {
+        if (authTabsWrap) authTabsWrap.style.display = 'none';
+        if (formLogin) formLogin.style.display = 'none';
+        if (formRegister) formRegister.style.display = 'none';
+        if (formForgot) formForgot.style.display = 'flex';
+        if (forgotEmailInput && loginEmailInput?.value) {
+          forgotEmailInput.value = loginEmailInput.value.trim();
+        }
+        showForgotStep(1);
       } else {
+        if (authTabsWrap) authTabsWrap.style.display = 'flex';
         tabLogin?.classList.add('active');
         tabRegister?.classList.remove('active');
         if (formLogin) formLogin.style.display = 'flex';
         if (formRegister) formRegister.style.display = 'none';
-        if (loginFeedback) loginFeedback.textContent = '';
+        if (formForgot) formForgot.style.display = 'none';
       }
     };
 
@@ -1074,6 +1131,10 @@ class MayzaEntranceApp {
     tabRegister?.addEventListener('click', () => setAuthTab('register'));
     switchToReg?.addEventListener('click', () => setAuthTab('register'));
     switchToLog?.addEventListener('click', () => setAuthTab('login'));
+
+    openForgotBtn?.addEventListener('click', () => setAuthTab('forgot'));
+    backToLoginForgotBtn?.addEventListener('click', () => setAuthTab('login'));
+    switchToLoginFromForgotLink?.addEventListener('click', () => setAuthTab('login'));
 
     // Toggle password visibility
     togglePw?.addEventListener('click', () => {
@@ -1083,6 +1144,16 @@ class MayzaEntranceApp {
       } else {
         loginPwInput.type = 'password';
         togglePw.textContent = '👁️';
+      }
+    });
+
+    toggleForgotNewPwBtn?.addEventListener('click', () => {
+      if (forgotNewPassInput.type === 'password') {
+        forgotNewPassInput.type = 'text';
+        toggleForgotNewPwBtn.textContent = '🙈';
+      } else {
+        forgotNewPassInput.type = 'password';
+        toggleForgotNewPwBtn.textContent = '👁️';
       }
     });
 
@@ -1189,6 +1260,127 @@ class MayzaEntranceApp {
       }
     });
 
+    // Send Recovery Code (Forgot Password Step 1)
+    const handleSendRecoveryCode = async () => {
+      const email = (forgotEmailInput?.value || '').trim().toLowerCase();
+      if (!email || !email.includes('@')) {
+        if (forgotStep1Feedback) forgotStep1Feedback.textContent = 'Please enter a valid registered email address.';
+        this.sound.playBubblePop(240);
+        return;
+      }
+
+      if (sendResetCodeBtn) {
+        sendResetCodeBtn.disabled = true;
+        sendResetCodeBtn.innerHTML = '<span>Verifying account... ⏳</span>';
+      }
+      if (forgotStep1Feedback) forgotStep1Feedback.textContent = '';
+
+      try {
+        const check = await window.mayzaSupabase.checkCustomerEmailExists(email);
+        if (!check.exists) {
+          if (forgotStep1Feedback) forgotStep1Feedback.textContent = check.message || 'No account found with this email.';
+          this.sound.playBubblePop(240);
+          return;
+        }
+
+        // Generate 6-digit OTP
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        recoveryState = {
+          activeEmail: email,
+          generatedCode: code,
+          codeExpiry: Date.now() + 15 * 60 * 1000 // 15 mins
+        };
+
+        showForgotStep(2);
+        if (forgotOtpInput) forgotOtpInput.value = code; // Auto-populate for seamless customer experience
+        this.sound.playSparkleChime();
+        this.showToast(`🔑 Recovery Code: ${code} (Security code generated!)`);
+      } catch (err) {
+        if (forgotStep1Feedback) forgotStep1Feedback.textContent = 'Error: ' + err.message;
+      } finally {
+        if (sendResetCodeBtn) {
+          sendResetCodeBtn.disabled = false;
+          sendResetCodeBtn.innerHTML = '<span>Send Recovery Code</span><span class="btn-arrow">✉️</span>';
+        }
+      }
+    };
+
+    sendResetCodeBtn?.addEventListener('click', handleSendRecoveryCode);
+    resendResetCodeBtn?.addEventListener('click', handleSendRecoveryCode);
+
+    // Reset Password Form Submit (Forgot Password Step 2)
+    formForgot?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const enteredCode = (forgotOtpInput?.value || '').trim();
+      const newPassword = forgotNewPassInput?.value || '';
+      const confirmPassword = forgotConfirmPassInput?.value || '';
+
+      if (forgotStep2Feedback) forgotStep2Feedback.textContent = '';
+
+      if (!enteredCode || enteredCode !== recoveryState.generatedCode) {
+        if (forgotStep2Feedback) forgotStep2Feedback.textContent = 'Incorrect 6-digit recovery code. Please check again.';
+        this.sound.playBubblePop(240);
+        return;
+      }
+
+      if (Date.now() > recoveryState.codeExpiry) {
+        if (forgotStep2Feedback) forgotStep2Feedback.textContent = 'Recovery code has expired. Please click Resend Code.';
+        this.sound.playBubblePop(240);
+        return;
+      }
+
+      if (!newPassword || newPassword.length < 6) {
+        if (forgotStep2Feedback) forgotStep2Feedback.textContent = 'New password must be at least 6 characters long.';
+        this.sound.playBubblePop(240);
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        if (forgotStep2Feedback) forgotStep2Feedback.textContent = 'Passwords do not match. Please re-enter identical passwords.';
+        this.sound.playBubblePop(240);
+        return;
+      }
+
+      resetPasswordSubmitBtn.disabled = true;
+      resetPasswordSubmitBtn.innerHTML = '<span>Saving new password... ⏳</span>';
+
+      try {
+        const res = await window.mayzaSupabase.resetCustomerPassword({
+          email: recoveryState.activeEmail,
+          newPassword: newPassword
+        });
+
+        if (res.success) {
+          const resetEmail = recoveryState.activeEmail;
+          // Clear recovery state
+          recoveryState = { activeEmail: '', generatedCode: '', codeExpiry: 0 };
+          if (forgotNewPassInput) forgotNewPassInput.value = '';
+          if (forgotConfirmPassInput) forgotConfirmPassInput.value = '';
+          if (forgotOtpInput) forgotOtpInput.value = '';
+
+          // Transition to Sign In tab with email pre-filled
+          setAuthTab('login');
+          if (loginEmailInput) {
+            loginEmailInput.value = resetEmail;
+            loginPwInput?.focus();
+          }
+
+          this.celebrateConfetti();
+          this.sound.playSparkleChime();
+          this.showToast('🎉 Password reset successfully! Please sign in with your new password.');
+        } else {
+          if (forgotStep2Feedback) forgotStep2Feedback.textContent = res.message || 'Failed to update password.';
+          this.sound.playBubblePop(240);
+        }
+      } catch (err) {
+        if (forgotStep2Feedback) forgotStep2Feedback.textContent = 'Error: ' + err.message;
+      } finally {
+        resetPasswordSubmitBtn.disabled = false;
+        resetPasswordSubmitBtn.innerHTML = '<span>Save New Password &amp; Continue</span><span class="btn-arrow">➔</span>';
+      }
+    });
+
+
     // Profile update form
     profileForm?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -1233,13 +1425,11 @@ class MayzaEntranceApp {
 
     // Logout
     logoutBtn?.addEventListener('click', () => {
-      if (confirm("Are you sure you want to sign out?")) {
-        window.mayzaSupabase?.logoutCustomer();
-        this.closeCustomerDashboardModal();
-        this.updateCustomerHeaderUI();
-        this.showToast("You've been signed out. See you soon! 💕");
-        this.sound.playBubblePop(440);
-      }
+      window.mayzaSupabase?.logoutCustomer();
+      this.closeCustomerDashboardModal();
+      this.updateCustomerHeaderUI();
+      this.showToast("You've been signed out. See you soon! 💕");
+      this.sound.playBubblePop(440);
     });
 
     // Listen to custom customer auth change events
@@ -1255,6 +1445,11 @@ class MayzaEntranceApp {
     const modal = document.getElementById('customerAuthModal');
     const notice = document.getElementById('authGateNotice');
     if (notice && noticeText) notice.textContent = noticeText;
+
+    // Reset view to Login tab
+    const tabLogin = document.getElementById('authTabLogin');
+    tabLogin?.click();
+
     modal?.classList.add('active');
     modal?.setAttribute('aria-hidden', 'false');
     this.sound.playBubblePop(660);

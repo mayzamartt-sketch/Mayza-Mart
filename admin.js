@@ -1729,6 +1729,26 @@ function initAdminAuth() {
     }
   });
 
+  // Forgot Passcode helper
+  const forgotPassBtn = document.getElementById("adminForgotPasscodeBtn");
+  const recoveryBox = document.getElementById("adminRecoveryBox");
+  const autofillBtn = document.getElementById("adminAutofillPassBtn");
+
+  forgotPassBtn?.addEventListener("click", () => {
+    if (recoveryBox) {
+      const isVisible = recoveryBox.style.display === "block";
+      recoveryBox.style.display = isVisible ? "none" : "block";
+      if (!isVisible) audio?.playBubblePop(520);
+    }
+  });
+
+  autofillBtn?.addEventListener("click", () => {
+    if (passwordInput) {
+      passwordInput.value = ADMIN_MASTER_PASSCODE;
+      lockForm?.dispatchEvent(new Event("submit"));
+    }
+  });
+
   // Handle unlock form submission
   lockForm?.addEventListener("submit", (e) => {
     e.preventDefault();

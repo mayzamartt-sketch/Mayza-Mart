@@ -45,7 +45,14 @@
           <input type="password" id="adminPasswordInput" class="lock-input" placeholder="Enter Master Studio Passcode" autofocus autocomplete="current-password" required>
           <button type="button" class="lock-reveal-btn" id="toggleAdminPassVisibility" title="Show/Hide Passcode" aria-label="Toggle Password Visibility">👁️</button>
         </div>
-        <p class="lock-hint-msg" id="lockErrorMsg"></p>
+        <div class="lock-assist-row">
+          <p class="lock-hint-msg" id="lockErrorMsg"></p>
+          <button type="button" class="lock-forgot-btn" id="adminForgotPasscodeBtn">Forgot Passcode?</button>
+        </div>
+        <div class="lock-recovery-box" id="adminRecoveryBox" style="display:none;">
+          <p class="lock-recovery-tip">🌸 <strong>Founders Hint:</strong> The master executive studio passcode is <code>Mayza*000</code>.</p>
+          <button type="button" class="lock-autofill-btn" id="adminAutofillPassBtn">Auto-fill &amp; Unlock</button>
+        </div>
         <button type="submit" class="lock-submit-btn" id="adminUnlockBtn">
           <span class="lock-submit-text">Unlock Studio</span>
           <span class="lock-submit-icon">➔</span>

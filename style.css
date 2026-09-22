@@ -2676,7 +2676,131 @@ body {
   text-decoration: underline;
 }
 
+.auth-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.auth-forgot-link {
+  background: transparent;
+  border: none;
+  color: #D9657B;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.auth-forgot-link:hover {
+  color: #FF2E79;
+  text-decoration: underline;
+}
+
+.auth-forgot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.auth-back-btn {
+  background: #FFF0F4;
+  border: 1px solid #FFD1DA;
+  color: #8F5E6B;
+  padding: 6px 12px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.auth-back-btn:hover {
+  background: #FFE0E7;
+  color: #D9657B;
+  transform: translateX(-2px);
+}
+
+.auth-forgot-badge {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #9E2A4B;
+  background: #FFE5ED;
+  padding: 4px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+}
+
+.auth-forgot-desc {
+  font-size: 0.85rem;
+  color: #7A4653;
+  line-height: 1.45;
+  margin: 0 0 0.5rem;
+  text-align: left;
+}
+
+.auth-code-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #FFF5F7;
+  border: 1px dashed #FFB5C5;
+  border-radius: 14px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  color: #63323F;
+  margin-bottom: 0.5rem;
+}
+
+.auth-resend-link {
+  background: transparent;
+  border: none;
+  color: #D9657B;
+  font-weight: 800;
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.auth-resend-link:hover {
+  color: #FF2E79;
+}
+
+.auth-code-input {
+  letter-spacing: 0.25em;
+  font-weight: 800;
+  font-size: 1.1rem;
+  text-align: center;
+  color: #4A1A26;
+}
+
+.auth-forgot-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  animation: fadeInStep 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInStep {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ============================================ */
+
 /* DASHBOARD MODAL STYLES                       */
 /* ============================================ */
 .dashboard-modal-card {
