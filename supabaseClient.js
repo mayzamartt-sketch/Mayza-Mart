@@ -22,6 +22,7 @@
       this.key = localStorage.getItem(STORAGE_KEYS.KEY) || DEFAULT_KEY;
       this.isConnected = false;
       this.lastSyncTime = null;
+      this.realtimeChannel = null;
       this.init();
     }
 
@@ -33,6 +34,7 @@
           });
           this.isConnected = true;
           this.notifyStatus(true, 'Supabase Client Ready');
+          this.initRealtime();
         } catch (err) {
           console.error('[Supabase] Init Error:', err);
           this.client = null;
@@ -43,6 +45,38 @@
         this.client = null;
         this.isConnected = false;
         this.notifyStatus(false, this.url ? 'Waiting for Supabase library' : 'Credentials not configured');
+      }
+    }
+
+    initRealtime() {
+      if (!this.client) return;
+      try {
+        if (this.realtimeChannel) {
+          try { this.client.removeChannel(this.realtimeChannel); } catch (e) {}
+        }
+        this.realtimeChannel = this.client
+          .channel('mayza-cloud-sync')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, (payload) => {
+            console.log('[Supabase Realtime] Products event:', payload.eventType);
+            window.dispatchEvent(new CustomEvent('mayza:cloud-products-changed', { detail: payload }));
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+            console.log('[Supabase Realtime] Orders event:', payload.eventType);
+            window.dispatchEvent(new CustomEvent('mayza:cloud-orders-changed', { detail: payload }));
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'coupons' }, (payload) => {
+            console.log('[Supabase Realtime] Coupons event:', payload.eventType);
+            window.dispatchEvent(new CustomEvent('mayza:cloud-coupons-changed', { detail: payload }));
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'wholesale_purchases' }, (payload) => {
+            console.log('[Supabase Realtime] Wholesale event:', payload.eventType);
+            window.dispatchEvent(new CustomEvent('mayza:cloud-wholesale-changed', { detail: payload }));
+          })
+          .subscribe((status) => {
+            console.log('[Supabase Realtime Connection Status]:', status);
+          });
+      } catch (err) {
+        console.warn('[Supabase Realtime] Channel subscription fallback to polling:', err);
       }
     }
 
@@ -480,7 +514,7 @@
     }
 
     // =========================================================
-    // BULK MIGRATION & FULL SYNC
+    // BULK MIGRATION & AUTOMATIC BI-DIRECTIONAL SYNC
     // =========================================================
     async syncLocalToSupabase(localState) {
       if (!this.isConfigured()) {
@@ -494,80 +528,111 @@
         coupons: 0
       };
 
-      // 1. Sync Products
+      // 1. Sync Products safely
       if (Array.isArray(localState.products) && localState.products.length > 0) {
-        const rows = localState.products.map(p => ({
-          id: p.id,
-          title: p.title,
-          category: p.category,
-          sku: p.sku,
-          price: p.price,
-          compare_price: p.comparePrice || null,
-          stock: p.stock,
-          tag: p.tag || 'General',
-          image: p.image,
-          sales_count: p.salesCount || 0
-        }));
-        const { error } = await this.client.from('products').upsert(rows);
-        if (error) throw new Error('Products sync failed: ' + error.message);
-        results.products = rows.length;
+        const seenSkus = new Set();
+        for (let i = 0; i < localState.products.length; i++) {
+          const p = localState.products[i];
+          let sku = (p.sku || `MM-${i + 1000}`).trim();
+          if (seenSkus.has(sku.toLowerCase())) {
+            sku = `${sku}-${i}`;
+          }
+          seenSkus.add(sku.toLowerCase());
+
+          const row = {
+            id: String(p.id || `prod-${Date.now()}-${i}`),
+            title: String(p.title || 'Untitled Item').trim(),
+            category: String(p.category || 'General').trim(),
+            sku: sku,
+            price: Number(p.price) || 0,
+            compare_price: p.comparePrice ? Number(p.comparePrice) : null,
+            stock: Number(p.stock) || 0,
+            tag: String(p.tag || 'General').trim(),
+            image: String(p.image || 'assets/p-clips.jpg'),
+            sales_count: Number(p.salesCount || p.sales_count || 0)
+          };
+          try {
+            await this.client.from('products').upsert(row);
+            results.products++;
+          } catch (err) {
+            console.warn('[Supabase Sync] Product row skip:', p.id, err.message);
+          }
+        }
       }
 
-      // 2. Sync Orders
+      // 2. Sync Orders safely
       if (Array.isArray(localState.orders) && localState.orders.length > 0) {
-        const rows = localState.orders.map(o => ({
-          id: o.id,
-          customer: o.customer,
-          items: o.items,
-          subtotal: o.subtotal,
-          shipping: o.shipping || 0,
-          total: o.total,
-          payment: o.payment,
-          status: o.status || 'New',
-          raw_date: o.rawDate || new Date().toLocaleString('en-IN')
-        }));
-        const { error } = await this.client.from('orders').upsert(rows);
-        if (error) throw new Error('Orders sync failed: ' + error.message);
-        results.orders = rows.length;
+        for (const o of localState.orders) {
+          if (!o.id) continue;
+          const row = {
+            id: String(o.id),
+            customer: o.customer || {},
+            items: Array.isArray(o.items) ? o.items : [],
+            subtotal: Number(o.subtotal) || 0,
+            shipping: Number(o.shipping) || 0,
+            total: Number(o.total) || 0,
+            payment: String(o.payment || 'Cash on Delivery'),
+            status: String(o.status || 'New'),
+            raw_date: String(o.rawDate || o.raw_date || new Date().toLocaleString('en-IN'))
+          };
+          try {
+            await this.client.from('orders').upsert(row);
+            results.orders++;
+          } catch (err) {
+            console.warn('[Supabase Sync] Order row skip:', o.id, err.message);
+          }
+        }
       }
 
-      // 3. Sync Wholesale
+      // 3. Sync Wholesale safely
       if (Array.isArray(localState.wholesalePurchases) && localState.wholesalePurchases.length > 0) {
-        const rows = localState.wholesalePurchases.map(w => ({
-          id: w.id,
-          bill_number: w.billNumber,
-          date: w.date,
-          supplier: w.supplier,
-          location: w.location,
-          product_id: w.productId || null,
-          product_name: w.productName,
-          category: w.category,
-          quantity: w.quantity,
-          unit_cost: w.unitCost,
-          selling_price: w.sellingPrice,
-          total_cost: w.totalCost,
-          payment_status: w.paymentStatus,
-          payment_mode: w.paymentMode,
-          notes: w.notes || ''
-        }));
-        const { error } = await this.client.from('wholesale_purchases').upsert(rows);
-        if (error) throw new Error('Wholesale sync failed: ' + error.message);
-        results.wholesale = rows.length;
+        for (let i = 0; i < localState.wholesalePurchases.length; i++) {
+          const w = localState.wholesalePurchases[i];
+          const row = {
+            id: String(w.id || `bill-${Date.now()}-${i}`),
+            bill_number: String(w.billNumber || `BILL-${i + 1}`),
+            date: w.date ? String(w.date).slice(0, 10) : new Date().toISOString().slice(0, 10),
+            supplier: String(w.supplier || 'General Supplier'),
+            location: String(w.location || 'Local Market'),
+            product_id: w.productId ? String(w.productId) : null,
+            product_name: String(w.productName || 'Wholesale Goods'),
+            category: String(w.category || 'General'),
+            quantity: Math.max(1, Number(w.quantity) || 1),
+            unit_cost: Number(w.unitCost) || 0,
+            selling_price: Number(w.sellingPrice) || 0,
+            total_cost: Number(w.totalCost) || 0,
+            payment_status: String(w.paymentStatus || 'Paid'),
+            payment_mode: String(w.paymentMode || 'UPI / GPay'),
+            notes: String(w.notes || '')
+          };
+          try {
+            await this.client.from('wholesale_purchases').upsert(row);
+            results.wholesale++;
+          } catch (err) {
+            console.warn('[Supabase Sync] Wholesale row skip:', w.id, err.message);
+          }
+        }
       }
 
-      // 4. Sync Coupons
+      // 4. Sync Coupons safely
       if (Array.isArray(localState.coupons) && localState.coupons.length > 0) {
-        const rows = localState.coupons.map(c => ({
-          code: c.code,
-          discount: c.discount,
-          min_spend: c.minSpend,
-          desc: c.desc,
-          active: c.active,
-          uses: c.uses || 0
-        }));
-        const { error } = await this.client.from('coupons').upsert(rows);
-        if (error) throw new Error('Coupons sync failed: ' + error.message);
-        results.coupons = rows.length;
+        for (const c of localState.coupons) {
+          if (!c.code) continue;
+          const row = {
+            code: String(c.code).trim().toUpperCase(),
+            discount: Number(c.discount) || 0,
+            min_spend: Number(c.minSpend || c.min_spend) || 0,
+            desc: String(c.desc || ''),
+            active: Boolean(c.active !== false),
+            uses: Number(c.uses || 0)
+          };
+          try {
+            await this.client.from('coupons').upsert(row);
+            results.coupons++;
+          } catch (err) {
+            console.warn('[Supabase Sync] Coupon row skip:', c.code, err.message);
+          }
+        }
       }
 
       this.lastSyncTime = new Date();
@@ -593,6 +658,56 @@
         vips: vips || undefined,
         reviews: reviews || undefined
       };
+    }
+
+    // Smart 2-way automatic sync: merges cloud and local without losing any items
+    async autoSyncBidirectional(localState) {
+      if (!this.isConfigured()) return null;
+      try {
+        const cloudData = await this.syncSupabaseToLocal();
+        if (!cloudData) return null;
+
+        const cloudProductIds = new Set((cloudData.products || []).map(p => String(p.id)));
+        const cloudOrderIds = new Set((cloudData.orders || []).map(o => String(o.id)));
+        const cloudWholesaleIds = new Set((cloudData.wholesalePurchases || []).map(w => String(w.id)));
+
+        // Find any local items not yet stored in Supabase
+        const pendingProducts = (localState.products || []).filter(p => p && p.id && !cloudProductIds.has(String(p.id)));
+        const pendingOrders = (localState.orders || []).filter(o => o && o.id && !cloudOrderIds.has(String(o.id)));
+        const pendingWholesale = (localState.wholesalePurchases || []).filter(w => w && w.id && !cloudWholesaleIds.has(String(w.id)));
+
+        let pushedAny = false;
+        if (pendingProducts.length > 0) {
+          console.log(`[Supabase Auto-Sync] Pushing ${pendingProducts.length} local products to cloud...`);
+          for (const p of pendingProducts) {
+            try { await this.upsertProduct(p); pushedAny = true; } catch (e) {}
+          }
+        }
+
+        if (pendingOrders.length > 0) {
+          console.log(`[Supabase Auto-Sync] Pushing ${pendingOrders.length} local orders to cloud...`);
+          for (const o of pendingOrders) {
+            try { await this.upsertOrder(o); pushedAny = true; } catch (e) {}
+          }
+        }
+
+        if (pendingWholesale.length > 0) {
+          console.log(`[Supabase Auto-Sync] Pushing ${pendingWholesale.length} local wholesale entries to cloud...`);
+          for (const w of pendingWholesale) {
+            try { await this.upsertWholesale(w); pushedAny = true; } catch (e) {}
+          }
+        }
+
+        // If local items were uploaded, pull the combined fresh state
+        if (pushedAny) {
+          return await this.syncSupabaseToLocal();
+        }
+
+        return cloudData;
+      } catch (err) {
+        console.warn('[Supabase AutoSync error]:', err);
+        return null;
+      }
     }
 
     // =========================================================

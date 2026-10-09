@@ -178,16 +178,39 @@ class StudioState {
   async initCloudSync() {
     if (!window.mayzaSupabase || !window.mayzaSupabase.isConfigured()) return false;
     try {
-      const data = await window.mayzaSupabase.syncSupabaseToLocal();
+      const data = await window.mayzaSupabase.autoSyncBidirectional(this);
       if (data) {
-        if (Array.isArray(data.products)) this.products = data.products;
-        if (Array.isArray(data.orders)) this.orders = data.orders;
-        if (Array.isArray(data.wholesalePurchases)) this.wholesalePurchases = data.wholesalePurchases;
-        if (Array.isArray(data.coupons)) this.coupons = data.coupons;
-        if (Array.isArray(data.vips)) this.vips = data.vips;
-        if (Array.isArray(data.reviews)) this.reviews = data.reviews;
-        this.save();
-        return true;
+        let changed = false;
+        if (Array.isArray(data.products) && data.products.length > 0) {
+          this.products = data.products;
+          changed = true;
+        }
+        if (Array.isArray(data.orders)) {
+          const localOrderMap = new Map((this.orders || []).map(o => [o.id, o]));
+          (data.orders || []).forEach(o => localOrderMap.set(o.id, o));
+          this.orders = Array.from(localOrderMap.values()).sort((a, b) => (b.id > a.id ? 1 : -1));
+          changed = true;
+        }
+        if (Array.isArray(data.wholesalePurchases)) {
+          this.wholesalePurchases = data.wholesalePurchases;
+          changed = true;
+        }
+        if (Array.isArray(data.coupons)) {
+          this.coupons = data.coupons;
+          changed = true;
+        }
+        if (Array.isArray(data.vips)) {
+          this.vips = data.vips;
+          changed = true;
+        }
+        if (Array.isArray(data.reviews)) {
+          this.reviews = data.reviews;
+          changed = true;
+        }
+        if (changed) {
+          this.save();
+          return true;
+        }
       }
     } catch (err) {
       console.warn('[StudioState] initCloudSync error:', err);
@@ -3407,4 +3430,83 @@ function initSupabaseManager() {
       }
     }).catch(console.warn);
   }
+
+  // Realtime listeners: automatically sync when changes happen on live site
+  window.addEventListener("mayza:cloud-products-changed", async (e) => {
+    console.log("[Admin Realtime] Products updated in cloud:", e.detail?.eventType);
+    const products = await window.mayzaSupabase.fetchProducts();
+    if (Array.isArray(products) && products.length > 0) {
+      state.products = products;
+      state.save();
+      renderProductMatrix();
+      renderDashboardOverview();
+      renderCategoryFilterPills();
+    }
+  });
+
+  window.addEventListener("mayza:cloud-orders-changed", async (e) => {
+    console.log("[Admin Realtime] Orders updated in cloud:", e.detail?.eventType);
+    const prevCount = state.orders.length;
+    const orders = await window.mayzaSupabase.fetchOrders();
+    if (Array.isArray(orders)) {
+      state.orders = orders;
+      state.save();
+      renderOrdersTable();
+      renderDashboardOverview();
+      if (orders.length > prevCount) {
+        showToast("🔔 New Live Storefront Order Received! 🛍️", "success");
+        audio?.playSuccess();
+        triggerCelebration();
+      }
+    }
+  });
+
+  window.addEventListener("mayza:cloud-coupons-changed", async () => {
+    const coupons = await window.mayzaSupabase.fetchCoupons();
+    if (Array.isArray(coupons)) {
+      state.coupons = coupons;
+      state.save();
+      renderCoupons();
+    }
+  });
+
+  window.addEventListener("mayza:cloud-wholesale-changed", async () => {
+    const wholesale = await window.mayzaSupabase.fetchWholesale();
+    if (Array.isArray(wholesale)) {
+      state.wholesalePurchases = wholesale;
+      state.save();
+      renderWholesalePurchases();
+      renderDashboardOverview();
+    }
+  });
+
+  // Background auto-sync interval (every 10 seconds)
+  setInterval(() => {
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured() && document.visibilityState === "visible") {
+      state.initCloudSync().then((hasChanges) => {
+        if (hasChanges) {
+          renderDashboardOverview();
+          renderOrdersTable();
+          renderProductMatrix();
+          renderCoupons();
+          renderWholesalePurchases();
+        }
+      }).catch(console.warn);
+    }
+  }, 10000);
+
+  // Sync immediately when admin switches back to this tab
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      state.initCloudSync().then((hasChanges) => {
+        if (hasChanges) {
+          renderDashboardOverview();
+          renderOrdersTable();
+          renderProductMatrix();
+          renderCoupons();
+          renderWholesalePurchases();
+        }
+      }).catch(console.warn);
+    }
+  });
 }

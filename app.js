@@ -903,6 +903,24 @@ class MayzaEntranceApp {
           this.syncLiveProducts();
         }
       });
+
+      window.addEventListener('mayza:cloud-products-changed', (e) => {
+        console.log('[Storefront Realtime] Cloud products updated:', e.detail?.eventType);
+        this.syncLiveProducts();
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          this.syncLiveProducts();
+        }
+      });
+
+      // Periodic light background sync every 15 seconds
+      setInterval(() => {
+        if (document.visibilityState === 'visible' && window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+          this.syncLiveProducts();
+        }
+      }, 15000);
     }
   }
 
