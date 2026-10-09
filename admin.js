@@ -21,6 +21,22 @@ const DEFAULT_REVIEWS = [];
 const DEFAULT_WHOLESALE_PURCHASES = [];
 
 // =========================================================
+// PERMANENT DEFAULT STORE CATEGORIES (Protected, Never Removed)
+// =========================================================
+const DEFAULT_CATEGORIES = [
+  { name: "Hair Accessories", emoji: "🎀", image: "assets/cat-hair.jpg", subtitle: "Style in every strand", colorClass: "bg-acc" },
+  { name: "Return Gifts", emoji: "🎁", image: "assets/cat-return-gifts.jpg", subtitle: "Make it memorable", colorClass: "bg-sec" },
+  { name: "Clips & Hair Bands", emoji: "🌸", image: "assets/p-clips.jpg", subtitle: "Cute & trendy", colorClass: "bg-lav" },
+  { name: "Handbags & Purses", emoji: "🛍️", shortName: "Handbags", image: "assets/cat-bags.jpg", subtitle: "Carry your style", colorClass: "bg-sec" },
+  { name: "Toys", emoji: "🧸", image: "assets/cat-toys.jpg", subtitle: "Fun for all ages", colorClass: "bg-sky" },
+  { name: "Stationery", emoji: "✏️", image: "assets/cat-stationery.jpg", subtitle: "Write • Create • Dream", colorClass: "bg-lav" },
+  { name: "Home & Lifestyle", emoji: "🏠", shortName: "Home", image: "assets/cat-home.jpg", subtitle: "Make it cozy", colorClass: "bg-pea" },
+  { name: "Jewellery & Fashion", emoji: "💎", shortName: "Jewellery", image: "assets/cat-jewellery.jpg", subtitle: "Accessorize your style", colorClass: "bg-acc" },
+  { name: "Party Supplies", emoji: "🎉", shortName: "Party", image: "assets/cat-party.jpg", subtitle: "Celebrate in style", colorClass: "bg-sec" },
+  { name: "Phone Accessories", emoji: "📱", shortName: "Phone", image: "assets/cat-phone.jpg", subtitle: "Stay connected", colorClass: "bg-sky" }
+];
+
+// =========================================================
 // 2. STATE MANAGER & PERSISTENCE
 // =========================================================
 class StudioState {
@@ -43,6 +59,7 @@ class StudioState {
     this.vips = this.load("mm_vips", DEFAULT_VIPS);
     this.reviews = this.load("mm_reviews", DEFAULT_REVIEWS);
     this.wholesalePurchases = this.load("mm_wholesale", DEFAULT_WHOLESALE_PURCHASES);
+    this.customCategories = this.load("mm_custom_categories", []);
     this.soundEnabled = localStorage.getItem("mm_sound") !== "false"; // default true
     this.currentView = "dashboard";
     this.currentCategoryFilter = "all";
@@ -66,10 +83,96 @@ class StudioState {
     localStorage.setItem("mm_vips", JSON.stringify(this.vips));
     localStorage.setItem("mm_reviews", JSON.stringify(this.reviews));
     localStorage.setItem("mm_wholesale", JSON.stringify(this.wholesalePurchases));
+    localStorage.setItem("mm_custom_categories", JSON.stringify(this.customCategories || []));
+    localStorage.setItem("mm_categories_timestamp", Date.now().toString());
 
     window.dispatchEvent(new CustomEvent('mayza:products-updated', {
       detail: { products: this.products }
     }));
+    window.dispatchEvent(new CustomEvent('mayza:categories-updated', {
+      detail: { categories: this.getAllCategories(), customCategories: this.customCategories }
+    }));
+  }
+
+  getAllCategories() {
+    const defaults = DEFAULT_CATEGORIES.map(c => ({ ...c }));
+    try {
+      const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+      defaults.forEach(cat => {
+        const ov = overrides[cat.name];
+        if (ov) {
+          if (ov.image) cat.image = ov.image;
+          if (ov.subtitle) cat.subtitle = ov.subtitle;
+          if (ov.emoji) cat.emoji = ov.emoji;
+        }
+      });
+    } catch(e) {}
+    const custom = Array.isArray(this.customCategories) ? this.customCategories : [];
+    
+    const existingNames = new Set([
+      ...defaults.map(c => c.name.toLowerCase()),
+      ...custom.map(c => c.name.toLowerCase())
+    ]);
+    
+    const extraFromProducts = [];
+    if (Array.isArray(this.products)) {
+      this.products.forEach(p => {
+        if (p.category && !existingNames.has(p.category.toLowerCase())) {
+          existingNames.add(p.category.toLowerCase());
+          extraFromProducts.push({
+            name: p.category,
+            emoji: "🏷️",
+            image: "assets/cat-return-gifts.jpg",
+            subtitle: "Explore collection",
+            isCustom: true
+          });
+        }
+      });
+    }
+
+    return [...defaults, ...custom, ...extraFromProducts];
+  }
+
+  addCustomCategory(name, emoji = "✨", image = "", subtitle = "") {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return null;
+    
+    const existing = this.getAllCategories().find(c => c.name.toLowerCase() === trimmed.toLowerCase());
+    if (existing) {
+      if (existing.isCustom && (image || subtitle)) {
+        if (image) existing.image = image;
+        if (subtitle) existing.subtitle = subtitle;
+        if (emoji && emoji !== "✨") existing.emoji = emoji;
+        this.save();
+      }
+      return existing;
+    }
+
+    const defaultImg = "assets/cat-return-gifts.jpg";
+    const newCat = {
+      name: trimmed,
+      emoji: (emoji || "").trim() || "✨",
+      image: (image || "").trim() || defaultImg,
+      subtitle: (subtitle || "").trim() || "Explore collection",
+      isCustom: true
+    };
+
+    if (!Array.isArray(this.customCategories)) {
+      this.customCategories = [];
+    }
+    this.customCategories.push(newCat);
+    this.save();
+    return newCat;
+  }
+
+  deleteCustomCategory(name) {
+    if (!name) return false;
+    const isDefault = DEFAULT_CATEGORIES.some(c => c.name.toLowerCase() === name.toLowerCase());
+    if (isDefault) return false; // Default categories can NEVER be deleted
+
+    this.customCategories = (this.customCategories || []).filter(c => c.name.toLowerCase() !== name.toLowerCase());
+    this.save();
+    return true;
   }
 
   async initCloudSync() {
@@ -100,6 +203,7 @@ class StudioState {
     this.vips = [...DEFAULT_VIPS];
     this.reviews = [...DEFAULT_REVIEWS];
     this.wholesalePurchases = [...DEFAULT_WHOLESALE_PURCHASES];
+    this.customCategories = [];
     this.save();
   }
 }
@@ -161,6 +265,25 @@ class StudioAudio {
         osc.start(this.ctx.currentTime + idx * 0.07);
         osc.stop(this.ctx.currentTime + idx * 0.07 + 0.2);
       });
+    } catch (e) {}
+  }
+
+  playBubblePop(freq = 520) {
+    if (!state.soundEnabled) return;
+    try {
+      this.init();
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, this.ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.08);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.08);
     } catch (e) {}
   }
 }
@@ -500,17 +623,22 @@ function renderOrdersTable() {
     const nextStatus = getNextStatus(o.status);
     const nextLabel = nextStatus ? `➔ ${nextStatus}` : "Completed ✨";
     const waUrl = getWhatsAppDispatchUrl(o);
+    const isPOS = o.channel === "pos" || (o.source && o.source.includes("In-Store")) || (o.payment && o.payment.includes("In-Store"));
+    const channelBadge = isPOS
+      ? `<span class="channel-badge channel-pos">🏬 In-Store POS</span>`
+      : `<span class="channel-badge channel-online">🌐 Online Store</span>`;
 
     return `
       <tr data-order-id="${o.id}">
         <td>
           <span class="order-id-badge">${o.id}</span>
+          <div>${channelBadge}</div>
         </td>
         <td>
           <div style="display: flex; flex-direction: column;">
             <strong style="color: var(--text-bright);">${o.customer.name}</strong>
-            <span style="font-size: 0.72rem; color: var(--text-muted);">${o.customer.phone}</span>
-            <span style="font-size: 0.7rem; color: var(--text-dim);">${o.customer.city}</span>
+            <span style="font-size: 0.72rem; color: var(--text-muted);">${o.customer.phone || 'No phone'}</span>
+            <span style="font-size: 0.7rem; color: var(--text-dim);">${o.customer.city || o.customer.address || 'In-Store'}</span>
           </div>
         </td>
         <td>
@@ -545,11 +673,33 @@ function renderOrdersTable() {
             <button class="row-btn slip-btn" onclick="openInvoiceModal('${o.id}')" title="Print Packing Slip">
               🖨️ Slip
             </button>
+            <button class="row-btn delete-order-btn" onclick="deleteOrder('${o.id}')" title="Delete Order">
+              🗑️
+            </button>
           </div>
         </td>
       </tr>
     `;
   }).join("");
+}
+
+function deleteOrder(orderId) {
+  const order = state.orders.find(o => o.id === orderId);
+  if (!order) return;
+
+  if (confirm(`Are you sure you want to delete order "${order.id}" (${order.customer.name} - ₹${order.total})?`)) {
+    state.orders = state.orders.filter(o => o.id !== orderId);
+    state.save();
+
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      window.mayzaSupabase.deleteOrder?.(orderId).catch(console.warn);
+    }
+
+    audio.playClick();
+    showToast(`Deleted order ${order.id}.`);
+    renderOrdersTable();
+    renderDashboardOverview();
+  }
 }
 
 function getNextStatus(current) {
@@ -788,11 +938,396 @@ function deleteProduct(productId) {
   }
 }
 
-// Product Modal (Add / Edit)
+// =========================================================
+// CATEGORY MANAGEMENT & DYNAMIC SELECTION ENGINE
+// =========================================================
+function renderCategorySelects(selectedCategory = null) {
+  const prodSelect = document.getElementById("prodCategory");
+  const wsSelect = document.getElementById("wsCategory");
+  const wsFilterSelect = document.getElementById("wholesaleCategoryFilter");
+  const allCats = state.getAllCategories();
+
+  if (prodSelect) {
+    const currentVal = selectedCategory || prodSelect.value;
+    prodSelect.innerHTML = allCats.map(c => `
+      <option value="${c.name}">${c.emoji ? c.emoji + " " : ""}${c.name}</option>
+    `).join("") + `
+      <option value="__create_new__">＋ Add New Category...</option>
+    `;
+    if (currentVal && currentVal !== "__create_new__") {
+      prodSelect.value = currentVal;
+    }
+  }
+
+  if (wsSelect) {
+    const currentWsVal = selectedCategory || wsSelect.value;
+    wsSelect.innerHTML = allCats.map(c => `
+      <option value="${c.name}">${c.emoji ? c.emoji + " " : ""}${c.name}</option>
+    `).join("") + `
+      <option value="__create_new__">＋ Add New Category...</option>
+    `;
+    if (currentWsVal && currentWsVal !== "__create_new__") {
+      wsSelect.value = currentWsVal;
+    }
+  }
+
+  if (wsFilterSelect) {
+    const currentFilterVal = wsFilterSelect.value || "all";
+    wsFilterSelect.innerHTML = `<option value="all">All Categories</option>` + allCats.map(c => `
+      <option value="${c.name}">${c.emoji ? c.emoji + " " : ""}${c.name}</option>
+    `).join("");
+    wsFilterSelect.value = currentFilterVal;
+  }
+}
+
+function renderCategoryFilterPills() {
+  const container = document.getElementById("productCategoryPills");
+  if (!container) return;
+
+  const allCats = state.getAllCategories();
+  const current = state.currentCategoryFilter || "all";
+
+  let html = `<button class="cat-filter-pill ${current === 'all' ? 'active' : ''}" data-category="all">All Products</button>`;
+
+  allCats.forEach(c => {
+    const isActive = current === c.name ? "active" : "";
+    const label = `${c.emoji ? c.emoji + " " : ""}${c.shortName || c.name}`;
+    const deleteBtn = c.isCustom ? `<span class="pill-del-btn" title="Remove custom category (Defaults are protected)" data-del-cat="${c.name}">&times;</span>` : "";
+    html += `<button class="cat-filter-pill ${isActive}" data-category="${c.name}">${label}${deleteBtn}</button>`;
+  });
+
+  container.innerHTML = html;
+}
+
+function showInlineCategoryCreator(isWholesale = false) {
+  const box = document.getElementById(isWholesale ? "wsInlineCategoryBox" : "inlineCategoryBox");
+  const input = document.getElementById(isWholesale ? "wsInlineCategoryName" : "inlineCategoryName");
+  const subtitleInput = document.getElementById(isWholesale ? "wsInlineCategorySubtitle" : "inlineCategorySubtitle");
+  const imageUrlInput = document.getElementById(isWholesale ? "wsInlineCategoryImageUrl" : "inlineCategoryImageUrl");
+  const emoji = document.getElementById(isWholesale ? "wsInlineCategoryEmoji" : "inlineCategoryEmoji");
+  const feedback = document.getElementById(isWholesale ? "wsInlineCategoryFeedback" : "inlineCategoryFeedback");
+  const previewRow = document.getElementById(isWholesale ? "wsCategoryPreviewRow" : "inlineCategoryPreviewRow");
+  const previewImg = document.getElementById(isWholesale ? "wsCategoryPreviewImg" : "inlineCategoryPreviewImg");
+
+  if (!box) return;
+
+  box.classList.remove("hidden");
+  if (feedback) {
+    feedback.textContent = "";
+    feedback.classList.remove("visible");
+  }
+  if (emoji && !emoji.value) {
+    emoji.value = "✨";
+  }
+  if (input) {
+    input.value = "";
+    setTimeout(() => input.focus(), 60);
+  }
+  if (subtitleInput) subtitleInput.value = "";
+  if (imageUrlInput) imageUrlInput.value = "";
+  if (previewRow) previewRow.style.display = "none";
+  if (previewImg) previewImg.src = "";
+}
+
+function hideInlineCategoryCreator(isWholesale = false) {
+  const box = document.getElementById(isWholesale ? "wsInlineCategoryBox" : "inlineCategoryBox");
+  if (box) box.classList.add("hidden");
+  const select = document.getElementById(isWholesale ? "wsCategory" : "prodCategory");
+  if (select && select.value === "__create_new__") {
+    select.value = DEFAULT_CATEGORIES[0].name;
+  }
+  const previewRow = document.getElementById(isWholesale ? "wsCategoryPreviewRow" : "inlineCategoryPreviewRow");
+  const previewImg = document.getElementById(isWholesale ? "wsCategoryPreviewImg" : "inlineCategoryPreviewImg");
+  if (previewRow) previewRow.style.display = "none";
+  if (previewImg) previewImg.src = "";
+}
+
+function updateCategoryPreview(isWholesale = false, src = "") {
+  const previewRow = document.getElementById(isWholesale ? "wsCategoryPreviewRow" : "inlineCategoryPreviewRow");
+  const previewImg = document.getElementById(isWholesale ? "wsCategoryPreviewImg" : "inlineCategoryPreviewImg");
+  const imageUrlInput = document.getElementById(isWholesale ? "wsInlineCategoryImageUrl" : "inlineCategoryImageUrl");
+
+  if (!previewRow || !previewImg) return;
+  const cleanSrc = (src || imageUrlInput?.value || "").trim();
+  if (cleanSrc) {
+    previewImg.src = cleanSrc;
+    previewRow.style.display = "flex";
+  } else {
+    previewImg.src = "";
+    previewRow.style.display = "none";
+  }
+}
+
+function handleCategoryFileUpload(isWholesale = false, fileInput) {
+  const file = fileInput?.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    showToast("Please select a valid image file! 🖼️", "warning");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    const imageUrlInput = document.getElementById(isWholesale ? "wsInlineCategoryImageUrl" : "inlineCategoryImageUrl");
+    if (imageUrlInput) {
+      imageUrlInput.value = dataUrl;
+    }
+    updateCategoryPreview(isWholesale, dataUrl);
+    showToast("Category image loaded! ✨");
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveInlineCategory(isWholesale = false) {
+  const input = document.getElementById(isWholesale ? "wsInlineCategoryName" : "inlineCategoryName");
+  const subtitleInput = document.getElementById(isWholesale ? "wsInlineCategorySubtitle" : "inlineCategorySubtitle");
+  const imageUrlInput = document.getElementById(isWholesale ? "wsInlineCategoryImageUrl" : "inlineCategoryImageUrl");
+  const emojiInput = document.getElementById(isWholesale ? "wsInlineCategoryEmoji" : "inlineCategoryEmoji");
+  const feedback = document.getElementById(isWholesale ? "wsInlineCategoryFeedback" : "inlineCategoryFeedback");
+
+  const name = (input?.value || "").trim();
+  const emoji = (emojiInput?.value || "").trim() || "✨";
+  const subtitle = (subtitleInput?.value || "").trim();
+  const image = (imageUrlInput?.value || "").trim();
+
+  if (!name) {
+    if (feedback) {
+      feedback.textContent = "Please enter a category name!";
+      feedback.classList.add("visible");
+    }
+    input?.focus();
+    return;
+  }
+
+  const existing = state.getAllCategories().find(c => c.name.toLowerCase() === name.toLowerCase());
+  if (existing) {
+    if (existing.isCustom && (image || subtitle)) {
+      state.addCustomCategory(name, emoji, image, subtitle);
+    }
+    renderCategorySelects(existing.name);
+    renderCategoryFilterPills();
+    hideInlineCategoryCreator(isWholesale);
+    showToast(`Category "${existing.name}" is already available and selected! ✨`);
+    return;
+  }
+
+  const newCat = state.addCustomCategory(name, emoji, image, subtitle);
+  if (newCat) {
+    renderCategorySelects(newCat.name);
+    renderCategoryFilterPills();
+    hideInlineCategoryCreator(isWholesale);
+    showToast(`Added new category "${newCat.emoji} ${newCat.name}" with live store sync! 🌸`);
+    if (audio?.playSuccess) audio.playSuccess();
+  }
+}
+
+// =========================================================
+// MANAGE CATEGORIES MODAL (Edit Images & Details)
+// =========================================================
+let _editingCatName = null; // track which category is being edited
+
+function openManageCategoriesModal() {
+  const modal = document.getElementById("manageCategoriesModal");
+  if (!modal) return;
+  modal.classList.add("active");
+  renderManageCatGrid();
+  // hide edit panel
+  const panel = document.getElementById("manageCatEditPanel");
+  if (panel) panel.classList.add("hidden");
+  _editingCatName = null;
+  audio.playClick();
+}
+
+function closeManageCategoriesModal() {
+  const modal = document.getElementById("manageCategoriesModal");
+  if (modal) modal.classList.remove("active");
+  _editingCatName = null;
+}
+
+function renderManageCatGrid() {
+  const grid = document.getElementById("manageCatGrid");
+  if (!grid) return;
+
+  const allCats = state.getAllCategories();
+  const defaultNames = new Set(DEFAULT_CATEGORIES.map(c => c.name.toLowerCase()));
+
+  grid.innerHTML = allCats.map(cat => {
+    const isDefault = defaultNames.has(cat.name.toLowerCase());
+    const img = cat.image || "assets/cat-return-gifts.jpg";
+    const label = `${cat.emoji || ""} ${cat.name}`.trim();
+    const selectedClass = _editingCatName === cat.name ? "selected" : "";
+    const defaultBadge = isDefault ? `<span class="manage-cat-thumb-default-badge">DEFAULT</span>` : "";
+
+    return `
+      <div class="manage-cat-thumb ${selectedClass}" data-cat-name="${cat.name}" title="Click to edit ${cat.name}">
+        ${defaultBadge}
+        <img src="${cat.image || 'assets/cat-return-gifts.jpg'}" alt="${cat.name}"
+             onerror="this.onerror=null; this.src='assets/cat-return-gifts.jpg';">
+        <div class="manage-cat-thumb-label">${label}</div>
+        <div class="manage-cat-thumb-edit-icon">✏️</div>
+      </div>
+    `;
+  }).join("");
+
+  // Bind click on each thumb
+  grid.querySelectorAll(".manage-cat-thumb").forEach(thumb => {
+    thumb.addEventListener("click", () => {
+      const catName = thumb.dataset.catName;
+      openCatEditPanel(catName);
+    });
+  });
+}
+
+function openCatEditPanel(catName) {
+  const allCats = state.getAllCategories();
+  const cat = allCats.find(c => c.name === catName);
+  if (!cat) return;
+
+  _editingCatName = catName;
+
+  // Update selected state
+  document.querySelectorAll(".manage-cat-thumb").forEach(t => {
+    t.classList.toggle("selected", t.dataset.catName === catName);
+  });
+
+  // Populate fields
+  const nameInput = document.getElementById("manageCatNameInput");
+  const subtitleInput = document.getElementById("manageCatSubtitleInput");
+  const emojiInput = document.getElementById("manageCatEmojiInput");
+  const imageUrlInput = document.getElementById("manageCatImageUrl");
+  const previewImg = document.getElementById("manageCatPreviewImg");
+  const previewName = document.getElementById("manageCatPreviewName");
+  const editNameLabel = document.getElementById("manageCatEditName");
+  const feedback = document.getElementById("manageCatFeedback");
+
+  if (nameInput) nameInput.value = cat.name;
+  if (subtitleInput) subtitleInput.value = cat.subtitle || "";
+  if (emojiInput) emojiInput.value = cat.emoji || "✨";
+  if (imageUrlInput) imageUrlInput.value = cat.image || "";
+  if (previewImg) {
+    previewImg.src = cat.image || "assets/cat-return-gifts.jpg";
+    previewImg.onerror = function() { this.onerror = null; this.src = "assets/cat-return-gifts.jpg"; };
+  }
+  if (previewName) previewName.textContent = `${cat.emoji || ""} ${cat.name}`;
+  if (editNameLabel) editNameLabel.textContent = cat.name;
+  if (feedback) { feedback.textContent = ""; feedback.classList.remove("visible"); }
+
+  // Show panel
+  const panel = document.getElementById("manageCatEditPanel");
+  if (panel) {
+    panel.classList.remove("hidden");
+    setTimeout(() => panel.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+  }
+
+  // File preview: reset file input
+  const fileInput = document.getElementById("manageCatImageFile");
+  if (fileInput) fileInput.value = "";
+}
+
+function saveCategoryImageChanges() {
+  if (!_editingCatName) return;
+
+  const nameInput = document.getElementById("manageCatNameInput");
+  const subtitleInput = document.getElementById("manageCatSubtitleInput");
+  const emojiInput = document.getElementById("manageCatEmojiInput");
+  const imageUrlInput = document.getElementById("manageCatImageUrl");
+  const feedback = document.getElementById("manageCatFeedback");
+
+  const newName = (nameInput?.value || "").trim();
+  const newSubtitle = (subtitleInput?.value || "").trim();
+  const newEmoji = (emojiInput?.value || "").trim() || "✨";
+  const newImage = (imageUrlInput?.value || "").trim();
+
+  if (!newName) {
+    if (feedback) { feedback.textContent = "Category name cannot be empty!"; feedback.classList.add("visible"); }
+    nameInput?.focus();
+    return;
+  }
+
+  const allCats = state.getAllCategories();
+  const cat = allCats.find(c => c.name === _editingCatName);
+  if (!cat) return;
+
+  const defaultNames = new Set(DEFAULT_CATEGORIES.map(c => c.name.toLowerCase()));
+  const isDefault = defaultNames.has(_editingCatName.toLowerCase());
+
+  // For default categories: only allow updating image and subtitle (not name/emoji since they're protected)
+  // For custom categories: allow all edits
+  if (isDefault) {
+    // Store default category overrides in a separate localStorage key
+    const overrides = JSON.parse(localStorage.getItem("mm_category_overrides") || "{}");
+    overrides[_editingCatName] = {
+      image: newImage || cat.image,
+      subtitle: newSubtitle || cat.subtitle,
+      emoji: newEmoji || cat.emoji
+    };
+    localStorage.setItem("mm_category_overrides", JSON.stringify(overrides));
+    localStorage.setItem("mm_categories_timestamp", Date.now().toString());
+
+    // Apply to in-memory DEFAULT_CATEGORIES too for immediate effect
+    const defCat = DEFAULT_CATEGORIES.find(c => c.name === _editingCatName);
+    if (defCat) {
+      if (newImage) defCat.image = newImage;
+      if (newSubtitle) defCat.subtitle = newSubtitle;
+      if (newEmoji) defCat.emoji = newEmoji;
+    }
+
+    showToast(`Updated picture & details for "${_editingCatName}"! 🌸 Syncing to live store...`);
+  } else {
+    // Custom category — update directly in state
+    const customCat = state.customCategories.find(c => c.name === _editingCatName);
+    if (customCat) {
+      customCat.image = newImage || customCat.image;
+      customCat.subtitle = newSubtitle || customCat.subtitle;
+      customCat.emoji = newEmoji || customCat.emoji;
+      if (newName !== _editingCatName) {
+        customCat.name = newName;
+        _editingCatName = newName;
+      }
+    }
+    state.save();
+    renderCategorySelects();
+    renderCategoryFilterPills();
+    showToast(`Category "${newName}" updated! 🖼️ Live store refreshed!`);
+  }
+
+  window.dispatchEvent(new CustomEvent('mayza:categories-updated', {
+    detail: { categories: state.getAllCategories() }
+  }));
+
+  renderManageCatGrid();
+  if (feedback) { feedback.textContent = ""; feedback.classList.remove("visible"); }
+  audio.playSuccess?.();
+}
+
+function handleManageCatFileUpload(fileInput) {
+  const file = fileInput?.files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) {
+    showToast("Please select a valid image file! 🖼️", "warning");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    const imageUrlInput = document.getElementById("manageCatImageUrl");
+    const previewImg = document.getElementById("manageCatPreviewImg");
+    if (imageUrlInput) imageUrlInput.value = dataUrl;
+    if (previewImg) previewImg.src = dataUrl;
+    showToast("Image loaded! Click Save Changes to apply. ✨");
+  };
+  reader.readAsDataURL(file);
+}
+
+
 function openAddProductModal() {
   document.getElementById("productModalTitle").textContent = "Add New Wonderland Product";
   document.getElementById("editProductId").value = "";
   document.getElementById("productForm").reset();
+  renderCategorySelects();
+  hideInlineCategoryCreator(false);
   document.getElementById("prodSku").value = `MM-${Date.now().toString().slice(-4)}`;
   document.getElementById("productModal").classList.add("active");
   audio.playClick();
@@ -801,6 +1336,9 @@ function openAddProductModal() {
 function openEditProductModal(productId) {
   const prod = state.products.find(p => p.id === productId);
   if (!prod) return;
+
+  renderCategorySelects(prod.category);
+  hideInlineCategoryCreator(false);
 
   document.getElementById("productModalTitle").textContent = "Edit Wonderland Product";
   document.getElementById("editProductId").value = prod.id;
@@ -826,6 +1364,7 @@ function openEditProductModal(productId) {
 }
 
 function closeProductModal() {
+  hideInlineCategoryCreator(false);
   document.getElementById("productModal").classList.remove("active");
 }
 
@@ -834,6 +1373,10 @@ function handleProductFormSubmit(e) {
   const editId = document.getElementById("editProductId").value;
   const title = document.getElementById("prodTitle").value.trim();
   const category = document.getElementById("prodCategory").value;
+  if (!category || category === "__create_new__") {
+    showToast("Please choose or save a valid category first! ⚠️", "warning");
+    return;
+  }
   const sku = document.getElementById("prodSku").value.trim() || `MM-${Date.now().toString().slice(-4)}`;
   const price = parseFloat(document.getElementById("prodPrice").value) || 0;
   const comparePrice = parseFloat(document.getElementById("prodComparePrice").value) || null;
@@ -886,6 +1429,7 @@ function handleProductFormSubmit(e) {
   }
 
   closeProductModal();
+  renderCategoryFilterPills();
   renderProductMatrix();
   renderDashboardOverview();
 }
@@ -930,6 +1474,109 @@ function openInvoiceModal(orderId) {
 function closeInvoiceModal() {
   document.getElementById("invoiceModal").classList.remove("active");
 }
+
+function printSlipDocument(elementId, docTitle = "Mayza Mart • Packing Slip") {
+  const printArea = document.getElementById(elementId);
+  if (!printArea) {
+    window.print();
+    return;
+  }
+
+  // Create or reuse an isolated hidden iframe for 100% clean, blank-free printing
+  let iframe = document.getElementById("mayzaPrintIframe");
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = "mayzaPrintIframe";
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "none";
+    iframe.style.opacity = "0";
+    iframe.style.pointerEvents = "none";
+    document.body.appendChild(iframe);
+  }
+
+  const iframeDoc = iframe.contentWindow.document;
+  iframeDoc.open();
+  iframeDoc.write(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${docTitle}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=JetBrains+Mono:wght@500;700&family=Outfit:wght@600;800;900&family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    @page { size: A4 portrait; margin: 10mm; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+    body {
+      background: #ffffff !important;
+      color: #0f172a !important;
+      margin: 0 !important;
+      padding: 16px !important;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .invoice-printable-sheet {
+      display: block !important;
+      width: 100% !important;
+      max-width: 800px !important;
+      margin: 0 auto !important;
+      padding: 24px !important;
+      background: #ffffff !important;
+      border: 1px solid #cbd5e1 !important;
+      border-radius: 12px !important;
+    }
+    .inv-top-bar { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+    .inv-brand { display: flex; align-items: center; gap: 14px; }
+    .inv-mascot { width: 54px; height: 54px; object-fit: contain; }
+    .inv-store-name { font-family: 'Outfit', sans-serif; font-size: 1.45rem; font-weight: 900; color: #0F172A; margin: 0; }
+    .inv-founders { font-size: 0.8rem; color: #D9657B; font-weight: 800; margin: 2px 0 0; }
+    .inv-contact { font-size: 0.72rem; color: #64748B; margin: 2px 0 0; }
+    .inv-badge-block { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .inv-badge-pill { font-size: 0.65rem; font-weight: 800; background: #0F172A; color: #FFFFFF; padding: 3px 8px; border-radius: 4px; letter-spacing: 0.05em; }
+    .inv-barcode { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; letter-spacing: 3px; color: #334155; }
+    .inv-order-id { font-family: 'JetBrains Mono', monospace; font-size: 1.15rem; font-weight: 900; color: #D9657B; }
+    .inv-divider { margin: 18px 0; border: none; border-top: 1px dashed #CBD5E1; }
+    .inv-addresses-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .inv-box { background: #F8FAFC !important; border: 1px solid #CBD5E1 !important; border-radius: 8px; padding: 12px; }
+    .inv-box-title { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; color: #64748B; margin-bottom: 4px; display: block; }
+    .inv-customer-name { font-size: 0.95rem; font-weight: 800; color: #0F172A; }
+    .inv-detail-line { font-size: 0.78rem; color: #475569; line-height: 1.4; }
+    .inv-meta-row { display: flex; justify-content: space-between; font-size: 0.78rem; color: #475569; margin-bottom: 3px; }
+    .inv-items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; border: 1px solid #CBD5E1; }
+    .inv-items-table th { background: #F1F5F9 !important; color: #334155; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; padding: 9px 12px; border-bottom: 1px solid #CBD5E1; text-align: left; }
+    .inv-items-table td { padding: 9px 12px; font-size: 0.82rem; color: #1E293B; border-bottom: 1px solid #E2E8F0; }
+    .inv-total-row td { font-size: 1rem; color: #D9657B; border-top: 2px solid #CBD5E1; padding-top: 12px; font-weight: 800; }
+    .inv-footer-note { margin-top: 18px; background: #FFF1F5 !important; border: 1px solid #FFE4ED !important; border-radius: 8px; padding: 14px; text-align: center; }
+    .note-stamp { font-size: 0.68rem; font-weight: 800; color: #D9657B; letter-spacing: 0.08em; margin-bottom: 4px; }
+    .note-script { font-family: 'Caveat', cursive; font-size: 1.3rem; color: #9F1239; margin: 4px 0; }
+    .note-sign { font-size: 0.75rem; font-weight: 800; color: #BE185D; margin: 2px 0 0; }
+    .text-right { text-align: right !important; }
+    .font-mono { font-family: 'JetBrains Mono', monospace !important; }
+  </style>
+</head>
+<body>
+  <div class="invoice-printable-sheet">
+    ${printArea.innerHTML}
+  </div>
+</body>
+</html>`);
+  iframeDoc.close();
+
+  setTimeout(() => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch (err) {
+      window.print();
+    }
+  }, 250);
+}
+
+window.printSlipDocument = printSlipDocument;
 
 // =========================================================
 // 11. PROMO & COUPON WIZARD
@@ -1281,6 +1928,8 @@ function openAddWholesaleModal() {
   document.getElementById("wsPurchaseDate").value = new Date().toISOString().split("T")[0];
   document.getElementById("wsSyncCheckbox").checked = true;
 
+  renderCategorySelects();
+  hideInlineCategoryCreator(true);
   populateWholesaleProductSelect();
   calculateWholesaleLiveMargin();
 
@@ -1289,6 +1938,7 @@ function openAddWholesaleModal() {
 }
 
 function closeAddWholesaleModal() {
+  hideInlineCategoryCreator(true);
   const modal = document.getElementById("wholesaleModal");
   if (modal) modal.classList.remove("active");
 }
@@ -1313,6 +1963,11 @@ function handleWholesaleFormSubmit(e) {
 
   if (!supplier || !productName || quantity <= 0 || unitCost <= 0) {
     showToast("Please provide supplier, product, quantity and cost.", "warning");
+    return;
+  }
+
+  if (!category || category === "__create_new__") {
+    showToast("Please choose or save a valid category first! ⚠️", "warning");
     return;
   }
 
@@ -1659,39 +2314,286 @@ function startLiveClock() {
   setInterval(update, 1000);
 }
 
-function simulateNewCustomerOrder() {
-  const names = ["Ayesha Khan", "Simran Bedi", "Kavya Nair", "Pooja Hegde", "Zara Merchant", "Rohit Malhotra"];
-  const cities = ["New Delhi", "Mumbai", "Jaipur", "Bengaluru", "Kolkata", "Hyderabad"];
-  const randomProduct = state.products[Math.floor(Math.random() * state.products.length)];
-  const randomName = names[Math.floor(Math.random() * names.length)];
-  const randomCity = cities[Math.floor(Math.random() * cities.length)];
+// =========================================================
+// 14. IN-STORE POS CUSTOMER BILLING ENGINE
+// =========================================================
+let posCart = []; // [{ id, title, sku, price, qty, image, maxStock }]
+
+function openInStoreBillModal() {
+  const modal = document.getElementById("inStoreBillModal");
+  if (!modal) return;
+
+  posCart = [];
+  document.getElementById("posCustName").value = "Walk-in Customer";
+  document.getElementById("posCustPhone").value = "";
+  document.getElementById("posBillDiscount").value = "0";
+  document.getElementById("posProductSearch").value = "";
+  
+  renderPosProductList();
+  renderPosCartItems();
+  calculatePosBillTotals();
+
+  modal.classList.add("active");
+  audio.playClick();
+}
+
+function closeInStoreBillModal() {
+  const modal = document.getElementById("inStoreBillModal");
+  if (modal) modal.classList.remove("active");
+  posCart = [];
+}
+
+function renderPosProductList(filterText = "") {
+  const container = document.getElementById("posProductList");
+  const countEl = document.getElementById("posCatalogCount");
+  if (!container) return;
+
+  const query = filterText.toLowerCase().trim();
+  const products = (state.products || []).filter(p => {
+    if (!query) return true;
+    return (p.title && p.title.toLowerCase().includes(query)) ||
+           (p.category && p.category.toLowerCase().includes(query)) ||
+           (p.sku && p.sku.toLowerCase().includes(query));
+  });
+
+  if (countEl) countEl.textContent = `${products.length} products`;
+
+  if (products.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 25px 15px; color: var(--text-muted); font-size: 0.82rem;">
+        No matching products in catalog. Add products in Inventory first.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = products.map(p => {
+    const stock = typeof p.stock === "number" ? p.stock : (parseInt(p.stock, 10) || 0);
+    const isOutOfStock = stock <= 0;
+    return `
+      <div class="pos-prod-card" data-prod-id="${p.id}" style="cursor: ${isOutOfStock ? 'not-allowed' : 'pointer'};">
+        <div class="pos-prod-left">
+          <img src="${p.image || 'assets/cat-return-gifts.jpg'}" alt="${p.title}" class="pos-prod-thumb"
+               onerror="this.onerror=null; this.src='assets/cat-return-gifts.jpg';">
+          <div class="pos-prod-meta">
+            <span class="pos-prod-title">${p.title}</span>
+            <span class="pos-prod-sub">₹${p.price} • Stock: <strong>${stock}</strong></span>
+          </div>
+        </div>
+        <button type="button" class="pos-add-btn" data-prod-id="${p.id}" ${isOutOfStock ? "disabled style='opacity:0.4; cursor:not-allowed;'" : ""}>
+          ${isOutOfStock ? "Out of Stock" : "＋ Add"}
+        </button>
+      </div>
+    `;
+  }).join("");
+}
+
+function addPosProductToCart(productId) {
+  if (!productId && productId !== 0) return;
+  const prod = (state.products || []).find(p => String(p.id) === String(productId));
+  if (!prod) {
+    console.warn("Product not found in state:", productId);
+    return;
+  }
+
+  const stock = typeof prod.stock === "number" ? prod.stock : (parseInt(prod.stock, 10) || 0);
+  if (stock <= 0) {
+    showToast(`"${prod.title}" is out of stock!`, "warning");
+    return;
+  }
+
+  const existing = posCart.find(item => String(item.id) === String(productId));
+  if (existing) {
+    if (existing.qty >= stock) {
+      showToast(`Cannot add more than available stock (${stock})!`, "warning");
+      return;
+    }
+    existing.qty += 1;
+  } else {
+    posCart.push({
+      id: prod.id,
+      title: prod.title,
+      sku: prod.sku || "MM-POS",
+      price: Number(prod.price) || 0,
+      qty: 1,
+      image: prod.image,
+      maxStock: stock
+    });
+  }
+
+  try {
+    if (audio && typeof audio.playBubblePop === "function") {
+      audio.playBubblePop(620);
+    } else if (audio && typeof audio.playClick === "function") {
+      audio.playClick();
+    }
+  } catch (err) {}
+
+  showToast(`Added "${prod.title}" to bill! 🛍️`);
+  renderPosCartItems();
+  calculatePosBillTotals();
+}
+
+function updatePosCartItemQty(productId, delta) {
+  const item = posCart.find(i => String(i.id) === String(productId));
+  if (!item) return;
+
+  const newQty = item.qty + delta;
+  if (newQty <= 0) {
+    removePosCartItem(productId);
+    return;
+  }
+
+  if (newQty > item.maxStock) {
+    showToast(`Maximum available stock is ${item.maxStock}`, "warning");
+    return;
+  }
+
+  item.qty = newQty;
+  renderPosCartItems();
+  calculatePosBillTotals();
+  try { audio?.playClick?.(); } catch (e) {}
+}
+
+function removePosCartItem(productId) {
+  posCart = posCart.filter(i => String(i.id) !== String(productId));
+  renderPosCartItems();
+  calculatePosBillTotals();
+  try { audio?.playClick?.(); } catch (e) {}
+}
+
+function renderPosCartItems() {
+  const container = document.getElementById("posCartItemsList");
+  const countBadge = document.getElementById("posCartItemCount");
+  if (!container) return;
+
+  const totalItemCount = posCart.reduce((sum, i) => sum + i.qty, 0);
+  if (countBadge) countBadge.textContent = totalItemCount;
+
+  if (posCart.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 30px 10px; color: var(--text-muted); font-size: 0.82rem;">
+        <span style="font-size: 1.6rem; display: block; margin-bottom: 4px;">🛍️</span>
+        Bill is empty. Pick items from the left catalog to add to this customer's bill.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = posCart.map(item => `
+    <div class="pos-cart-row">
+      <div style="display: flex; flex-direction: column; max-width: 140px;">
+        <strong style="font-size: 0.78rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${item.title}</strong>
+        <span style="font-size: 0.7rem; color: var(--text-muted);">₹${item.price} each</span>
+      </div>
+      <div class="pos-cart-qty-ctrl">
+        <button type="button" class="pos-qty-btn" data-action="dec" data-prod-id="${item.id}">-</button>
+        <span style="font-weight: 700; font-size: 0.85rem; min-width: 20px; text-align: center;">${item.qty}</span>
+        <button type="button" class="pos-qty-btn" data-action="inc" data-prod-id="${item.id}">+</button>
+      </div>
+      <span style="font-family: var(--font-brand); font-weight: 800; font-size: 0.85rem; color: var(--text-primary); min-width: 45px; text-align: right;">
+        ₹${item.price * item.qty}
+      </span>
+      <button type="button" class="pos-del-item-btn" data-action="del" data-prod-id="${item.id}" title="Remove item">×</button>
+    </div>
+  `).join("");
+}
+
+// Export POS functions globally on window
+window.addPosProductToCart = addPosProductToCart;
+window.updatePosCartItemQty = updatePosCartItemQty;
+window.removePosCartItem = removePosCartItem;
+window.deleteOrder = deleteOrder;
+window.advanceOrderStatus = advanceOrderStatus;
+window.openInvoiceModal = openInvoiceModal;
+
+function calculatePosBillTotals() {
+  const subtotal = posCart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+  const discount = Math.max(0, parseFloat(document.getElementById("posBillDiscount")?.value) || 0);
+  const grandTotal = Math.max(0, subtotal - discount);
+
+  const subtotalEl = document.getElementById("posBillSubtotal");
+  const grandTotalEl = document.getElementById("posBillGrandTotal");
+
+  if (subtotalEl) subtotalEl.textContent = `₹${subtotal.toLocaleString("en-IN")}`;
+  if (grandTotalEl) grandTotalEl.textContent = `₹${grandTotal.toLocaleString("en-IN")}`;
+}
+
+function handlePosBillSubmit(e) {
+  e.preventDefault();
+
+  if (posCart.length === 0) {
+    showToast("Please add at least 1 product to the bill!", "warning");
+    return;
+  }
+
+  const custName = (document.getElementById("posCustName")?.value || "").trim() || "Walk-in Customer";
+  const custPhone = (document.getElementById("posCustPhone")?.value || "").trim() || "+91 (In-Store)";
+  const paymentMode = document.getElementById("posPaymentMode")?.value || "Cash • In-Store";
+  const discount = Math.max(0, parseFloat(document.getElementById("posBillDiscount")?.value) || 0);
+  const subtotal = posCart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+  const grandTotal = Math.max(0, subtotal - discount);
+
+  const orderId = `MM-POS-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  // Deduct stock from products
+  posCart.forEach(cartItem => {
+    const prod = (state.products || []).find(p => String(p.id) === String(cartItem.id));
+    if (prod) {
+      const curStock = typeof prod.stock === "number" ? prod.stock : (parseInt(prod.stock, 10) || 0);
+      const curSales = typeof prod.salesCount === "number" ? prod.salesCount : (parseInt(prod.salesCount, 10) || 0);
+      prod.stock = Math.max(0, curStock - cartItem.qty);
+      prod.salesCount = curSales + cartItem.qty;
+      if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+        window.mayzaSupabase.upsertProduct(prod).catch(console.warn);
+      }
+    }
+  });
 
   const newOrder = {
-    id: `MM-${Math.floor(8842 + Math.random() * 500)}`,
+    id: orderId,
+    channel: "pos",
+    source: "In-Store / POS (Walk-in)",
     customer: {
-      name: randomName,
-      phone: `+91 98${Math.floor(10000000 + Math.random() * 90000000)}`,
-      city: `${randomCity}, IN`,
-      address: `Tower ${Math.floor(1 + Math.random() * 12)}, Sunshine Heights, ${randomCity}`
+      name: custName,
+      phone: custPhone,
+      city: "In-Store (Mayza Mart)",
+      address: "In-Store Billing Counter"
     },
-    items: [
-      { name: randomProduct.title, sku: randomProduct.sku, qty: 1, price: randomProduct.price }
-    ],
-    subtotal: randomProduct.price,
-    shipping: randomProduct.price > 499 ? 0 : 49,
-    total: randomProduct.price + (randomProduct.price > 499 ? 0 : 49),
-    payment: "UPI • Instant",
-    status: "New",
+    items: posCart.map(i => ({
+      name: i.title,
+      sku: i.sku || "MM-POS",
+      qty: i.qty,
+      price: i.price
+    })),
+    subtotal: subtotal,
+    discount: discount,
+    shipping: 0,
+    total: grandTotal,
+    payment: paymentMode,
+    status: "Delivered",
     timestamp: "Just now",
     rawDate: new Date().toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
   };
 
   state.orders.unshift(newOrder);
   state.save();
-  showToast(`⚡ New order received: ${newOrder.id} from ${randomName}! (₹${newOrder.total})`);
+
+  if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+    window.mayzaSupabase.createOrder(newOrder).catch(console.warn);
+  }
+
+  closeInStoreBillModal();
+  showToast(`🧾 In-Store Bill generated for ${custName}! (₹${grandTotal})`);
   triggerCelebration();
+  audio?.playSuccess();
+
   renderOrdersTable();
+  renderProductMatrix();
   renderDashboardOverview();
+
+  // Open invoice / slip for instant printing
+  openInvoiceModal(orderId);
 }
 
 // =========================================================
@@ -1797,6 +2699,10 @@ document.addEventListener("DOMContentLoaded", () => {
   initAdminAuth();
   startLiveClock();
   renderDashboardOverview();
+
+  // Initialize dynamic category filters & selects on load
+  renderCategoryFilterPills();
+  renderCategorySelects();
 
   // Sidebar navigation clicks
   document.querySelectorAll(".sidebar-nav .nav-item").forEach(item => {
@@ -1907,10 +2813,111 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Order filter search input
   document.getElementById("orderFilterInput")?.addEventListener("input", renderOrdersTable);
-  document.getElementById("simulateOrderBtn")?.addEventListener("click", simulateNewCustomerOrder);
 
-  // Product category pills
+  // In-Store POS Billing Modal Listeners
+  document.getElementById("openInStoreBillModalBtn")?.addEventListener("click", openInStoreBillModal);
+  document.getElementById("closeInStoreBillBtn")?.addEventListener("click", closeInStoreBillModal);
+  document.getElementById("cancelInStoreBillBtn")?.addEventListener("click", closeInStoreBillModal);
+  document.getElementById("inStoreBillModal")?.addEventListener("click", (e) => {
+    if (e.target === document.getElementById("inStoreBillModal")) closeInStoreBillModal();
+  });
+  document.getElementById("posBillForm")?.addEventListener("submit", handlePosBillSubmit);
+  document.getElementById("posProductSearch")?.addEventListener("input", (e) => {
+    renderPosProductList(e.target.value);
+  });
+  document.getElementById("posBillDiscount")?.addEventListener("input", calculatePosBillTotals);
+  document.getElementById("posClearCartBtn")?.addEventListener("click", () => {
+    posCart = [];
+    renderPosCartItems();
+    calculatePosBillTotals();
+    try { audio?.playClick?.(); } catch (e) {}
+  });
+
+  // Delegated click listeners for POS catalog (card or + Add button)
+  document.getElementById("posProductList")?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".pos-add-btn");
+    if (btn) {
+      if (btn.disabled) return;
+      const pid = btn.dataset.prodId;
+      if (pid) addPosProductToCart(pid);
+      return;
+    }
+    const card = e.target.closest(".pos-prod-card");
+    if (card) {
+      const cardBtn = card.querySelector(".pos-add-btn");
+      if (cardBtn && !cardBtn.disabled) {
+        const pid = cardBtn.dataset.prodId;
+        if (pid) addPosProductToCart(pid);
+      }
+    }
+  });
+
+  // Delegated click listeners for POS cart items (+, -, x)
+  document.getElementById("posCartItemsList")?.addEventListener("click", (e) => {
+    const qtyBtn = e.target.closest(".pos-qty-btn");
+    if (qtyBtn) {
+      e.preventDefault();
+      const pid = qtyBtn.dataset.prodId;
+      const action = qtyBtn.dataset.action;
+      if (pid) {
+        updatePosCartItemQty(pid, action === "inc" ? 1 : -1);
+      }
+      return;
+    }
+    const delBtn = e.target.closest(".pos-del-item-btn");
+    if (delBtn) {
+      e.preventDefault();
+      const pid = delBtn.dataset.prodId;
+      if (pid) {
+        removePosCartItem(pid);
+      }
+      return;
+    }
+  });
+
+  // Real-time live online orders listener from Storefront (cross-tab sync)
+  window.addEventListener("storage", (e) => {
+    if (e.key === "mm_orders" || e.key === "mm_orders_timestamp") {
+      state.orders = state.load("mm_orders", DEFAULT_ORDERS);
+      renderOrdersTable();
+      renderDashboardOverview();
+      audio?.playBubblePop(880);
+      showToast("⚡ New live online order received from storefront! 🛍️");
+    }
+  });
+  window.addEventListener("mayza:orders-updated", (e) => {
+    if (e.detail?.orders) {
+      state.orders = e.detail.orders;
+    } else {
+      state.orders = state.load("mm_orders", DEFAULT_ORDERS);
+    }
+    renderOrdersTable();
+    renderDashboardOverview();
+  });
+
+  // Product category pills (filter + delete custom categories)
   document.getElementById("productCategoryPills")?.addEventListener("click", (e) => {
+    // Handle delete button on custom category pills
+    const delBtn = e.target.closest(".pill-del-btn");
+    if (delBtn) {
+      e.stopPropagation();
+      const catName = delBtn.dataset.delCat;
+      if (catName && confirm(`Remove custom category "${catName}"? Products in this category will keep their category label but the filter pill will be removed.`)) {
+        const deleted = state.deleteCustomCategory(catName);
+        if (deleted) {
+          if (state.currentCategoryFilter === catName) {
+            state.currentCategoryFilter = "all";
+          }
+          renderCategoryFilterPills();
+          renderCategorySelects();
+          showToast(`Removed category "${catName}" 🗑️`);
+          audio.playClick();
+        } else {
+          showToast("Default categories cannot be removed! 🔒", "warning");
+        }
+      }
+      return;
+    }
     const pill = e.target.closest(".cat-filter-pill");
     if (pill) {
       document.querySelectorAll(".cat-filter-pill").forEach(p => p.classList.remove("active"));
@@ -1919,6 +2926,126 @@ document.addEventListener("DOMContentLoaded", () => {
       audio.playClick();
       renderProductMatrix();
     }
+  });
+
+  // --- Inline Category Creator: Product Modal ---
+  // Toggle box via "＋ New Category" button next to label
+  document.getElementById("toggleAddCategoryBtn")?.addEventListener("click", () => {
+    const box = document.getElementById("inlineCategoryBox");
+    if (box && box.classList.contains("hidden")) {
+      showInlineCategoryCreator(false);
+    } else {
+      hideInlineCategoryCreator(false);
+    }
+  });
+
+  // Also open when user picks "+ Add New Category..." from dropdown
+  document.getElementById("prodCategory")?.addEventListener("change", (e) => {
+    if (e.target.value === "__create_new__") {
+      showInlineCategoryCreator(false);
+    } else {
+      hideInlineCategoryCreator(false);
+    }
+  });
+
+  document.getElementById("saveInlineCategoryBtn")?.addEventListener("click", () => saveInlineCategory(false));
+  document.getElementById("cancelInlineCategoryBtn")?.addEventListener("click", () => hideInlineCategoryCreator(false));
+
+  // Enter key saves the category
+  document.getElementById("inlineCategoryName")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveInlineCategory(false); }
+    if (e.key === "Escape") { hideInlineCategoryCreator(false); }
+  });
+  document.getElementById("inlineCategoryImageUrl")?.addEventListener("input", () => updateCategoryPreview(false));
+  document.getElementById("inlineCategoryImageFile")?.addEventListener("change", function() {
+    handleCategoryFileUpload(false, this);
+  });
+  document.getElementById("inlineCategoryRemoveImg")?.addEventListener("click", () => {
+    const input = document.getElementById("inlineCategoryImageUrl");
+    if (input) input.value = "";
+    const file = document.getElementById("inlineCategoryImageFile");
+    if (file) file.value = "";
+    updateCategoryPreview(false, "");
+  });
+
+  // --- Inline Category Creator: Wholesale Modal ---
+  document.getElementById("toggleWsAddCategoryBtn")?.addEventListener("click", () => {
+    const box = document.getElementById("wsInlineCategoryBox");
+    if (box && box.classList.contains("hidden")) {
+      showInlineCategoryCreator(true);
+    } else {
+      hideInlineCategoryCreator(true);
+    }
+  });
+
+  document.getElementById("wsCategory")?.addEventListener("change", (e) => {
+    if (e.target.value === "__create_new__") {
+      showInlineCategoryCreator(true);
+    } else {
+      hideInlineCategoryCreator(true);
+    }
+  });
+
+  document.getElementById("saveWsInlineCategoryBtn")?.addEventListener("click", () => saveInlineCategory(true));
+  document.getElementById("cancelWsInlineCategoryBtn")?.addEventListener("click", () => hideInlineCategoryCreator(true));
+
+  document.getElementById("wsInlineCategoryName")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); saveInlineCategory(true); }
+    if (e.key === "Escape") { hideInlineCategoryCreator(true); }
+  });
+  document.getElementById("wsInlineCategoryImageUrl")?.addEventListener("input", () => updateCategoryPreview(true));
+  document.getElementById("wsCategoryImageFile")?.addEventListener("change", function() {
+    handleCategoryFileUpload(true, this);
+  });
+  document.getElementById("wsCategoryRemoveImg")?.addEventListener("click", () => {
+    const input = document.getElementById("wsInlineCategoryImageUrl");
+    if (input) input.value = "";
+    const file = document.getElementById("wsCategoryImageFile");
+    if (file) file.value = "";
+    updateCategoryPreview(true, "");
+  });
+
+  // --- Manage Categories Modal ---
+  document.getElementById("manageCategoriesBtn")?.addEventListener("click", () => openManageCategoriesModal());
+  document.getElementById("closeManageCategoriesBtn")?.addEventListener("click", () => closeManageCategoriesModal());
+  document.getElementById("manageCategoriesModal")?.addEventListener("click", (e) => {
+    if (e.target === document.getElementById("manageCategoriesModal")) closeManageCategoriesModal();
+  });
+  document.getElementById("saveCatChangesBtn")?.addEventListener("click", () => saveCategoryImageChanges());
+  document.getElementById("cancelCatChangesBtn")?.addEventListener("click", () => {
+    const panel = document.getElementById("manageCatEditPanel");
+    if (panel) panel.classList.add("hidden");
+    _editingCatName = null;
+    document.querySelectorAll(".manage-cat-thumb").forEach(t => t.classList.remove("selected"));
+  });
+  document.getElementById("closeCatEditPanelBtn")?.addEventListener("click", () => {
+    const panel = document.getElementById("manageCatEditPanel");
+    if (panel) panel.classList.add("hidden");
+    _editingCatName = null;
+    document.querySelectorAll(".manage-cat-thumb").forEach(t => t.classList.remove("selected"));
+  });
+  document.getElementById("manageCatImageUrl")?.addEventListener("input", () => {
+    const url = document.getElementById("manageCatImageUrl")?.value?.trim();
+    const previewImg = document.getElementById("manageCatPreviewImg");
+    if (previewImg && url) {
+      previewImg.src = url;
+      previewImg.onerror = function() { this.onerror = null; this.src = "assets/cat-return-gifts.jpg"; };
+    }
+  });
+  document.getElementById("manageCatImageFile")?.addEventListener("change", function() {
+    handleManageCatFileUpload(this);
+  });
+  document.getElementById("manageCatNameInput")?.addEventListener("input", () => {
+    const previewName = document.getElementById("manageCatPreviewName");
+    const emoji = document.getElementById("manageCatEmojiInput")?.value || "";
+    const name = document.getElementById("manageCatNameInput")?.value || "";
+    if (previewName) previewName.textContent = `${emoji} ${name}`.trim();
+  });
+  document.getElementById("manageCatEmojiInput")?.addEventListener("input", () => {
+    const previewName = document.getElementById("manageCatPreviewName");
+    const emoji = document.getElementById("manageCatEmojiInput")?.value || "";
+    const name = document.getElementById("manageCatNameInput")?.value || "";
+    if (previewName) previewName.textContent = `${emoji} ${name}`.trim();
   });
 
   // Product search input
@@ -1949,7 +3076,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Invoice Modal Print & Close
   document.getElementById("closeInvoiceModalBtn")?.addEventListener("click", closeInvoiceModal);
   document.getElementById("printInvoiceBtn")?.addEventListener("click", () => {
-    window.print();
+    printSlipDocument("invoicePrintArea", "Mayza Mart • Customer Packing Slip");
   });
 
   // Coupons
@@ -2048,7 +3175,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Wholesale bill slip modal
   document.getElementById("closeWholesaleBillModalBtn")?.addEventListener("click", closeWholesaleBillModal);
-  document.getElementById("printWholesaleBillBtn")?.addEventListener("click", () => window.print());
+  document.getElementById("printWholesaleBillBtn")?.addEventListener("click", () => {
+    printSlipDocument("wholesalePrintArea", "Mayza Mart • Wholesale Procurement Voucher");
+  });
 
   // Initial render of wholesale count badge & data
   renderWholesalePurchases();

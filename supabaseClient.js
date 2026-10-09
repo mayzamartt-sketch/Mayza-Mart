@@ -210,6 +210,16 @@
     }
 
     async updateOrderStatus(orderId, newStatus) {
+      // Always sync localStorage first so customer profile stays up-to-date
+      try {
+        const localOrders = JSON.parse(localStorage.getItem('mm_orders') || '[]');
+        const idx = localOrders.findIndex(o => o.id === orderId);
+        if (idx !== -1) {
+          localOrders[idx].status = newStatus;
+          localStorage.setItem('mm_orders', JSON.stringify(localOrders));
+        }
+      } catch (e) {}
+
       if (!this.isConfigured()) return false;
       try {
         const { error } = await this.client
@@ -220,6 +230,22 @@
         return true;
       } catch (err) {
         console.error('[Supabase] updateOrderStatus error:', err);
+        throw err;
+      }
+    }
+
+    async createOrder(order) {
+      return this.upsertOrder(order);
+    }
+
+    async deleteOrder(orderId) {
+      if (!this.isConfigured()) return false;
+      try {
+        const { error } = await this.client.from('orders').delete().eq('id', orderId);
+        if (error) throw error;
+        return true;
+      } catch (err) {
+        console.error('[Supabase] deleteOrder error:', err);
         throw err;
       }
     }
@@ -826,18 +852,36 @@
     async getCustomerOrders(email, phone) {
       const cleanEmail = (email || '').trim().toLowerCase();
       let orders = [];
+      let fromSupabase = false;
 
       // Fetch from Supabase
       if (this.isConfigured()) {
         try {
           const allOrders = await this.fetchOrders();
           if (Array.isArray(allOrders)) {
-            orders = allOrders.filter(o => {
+            const customerOrders = allOrders.filter(o => {
               const cust = o.customer || {};
               const orderEmail = (cust.email || '').toLowerCase();
               const orderPhone = (cust.phone || '').trim();
               return (cleanEmail && orderEmail === cleanEmail) || (phone && orderPhone === phone);
             });
+            if (customerOrders.length > 0) {
+              orders = customerOrders;
+              fromSupabase = true;
+              // Sync fresh Supabase statuses back into localStorage
+              try {
+                const localOrders = JSON.parse(localStorage.getItem('mm_orders') || '[]');
+                let changed = false;
+                customerOrders.forEach(sbOrder => {
+                  const li = localOrders.findIndex(lo => lo.id === sbOrder.id);
+                  if (li !== -1 && localOrders[li].status !== sbOrder.status) {
+                    localOrders[li].status = sbOrder.status;
+                    changed = true;
+                  }
+                });
+                if (changed) localStorage.setItem('mm_orders', JSON.stringify(localOrders));
+              } catch (e) {}
+            }
           }
         } catch (err) {
           console.warn('[Supabase] getCustomerOrders error:', err);
@@ -845,15 +889,16 @@
       }
 
       // If empty or offline, check local storage orders
-      if (!orders || orders.length === 0) {
+      if (!fromSupabase || orders.length === 0) {
         try {
           const localOrders = JSON.parse(localStorage.getItem('mm_orders') || '[]');
-          orders = localOrders.filter(o => {
+          const localFiltered = localOrders.filter(o => {
             const cust = o.customer || {};
             const orderEmail = (cust.email || '').toLowerCase();
             const orderPhone = (cust.phone || '').trim();
             return (cleanEmail && orderEmail === cleanEmail) || (phone && orderPhone === phone);
           });
+          if (localFiltered.length > 0) orders = localFiltered;
         } catch (e) {}
       }
 

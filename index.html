@@ -698,7 +698,7 @@
       <section class="mayza-category-bar-section" id="categoryBarSection">
         <h2 class="category-section-title">Shop by category</h2>
         <!-- Horizontal Scrollable Glass Ribbon -->
-        <div class="glass-category-strip no-scrollbar">
+        <div class="glass-category-strip no-scrollbar" id="storeCategoryStrip">
           <a href="#categories" class="cat-pill-btn">
             <span class="cat-icon-circle bg-sec">🎁</span>
             <span class="cat-label">Return Gifts</span>
@@ -791,7 +791,7 @@
               </a>
             </div>
 
-            <div class="category-cards-grid">
+            <div class="category-cards-grid" id="storeCategoryCardsGrid">
               <a href="#bestsellers" class="cat-product-card">
                 <div class="cat-card-media">
                   <img src="assets/cat-return-gifts.jpg" alt="Return Gifts" loading="lazy">
@@ -1156,9 +1156,67 @@
     </div>
   </section>
 
-
   <!-- ============================================ -->
-  <!-- CUSTOMER AUTHENTICATION GATEWAY MODAL        -->
+  <!-- CATEGORY PAGE FULL-SCREEN OVERLAY            -->
+  <!-- ============================================ -->
+  <div id="categoryPageOverlay" class="cat-page-overlay" aria-hidden="true">
+    <!-- Sticky Header -->
+    <div class="cat-page-header">
+      <button class="cat-page-back-btn" id="catPageBackBtn" aria-label="Go back">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <span>Back</span>
+      </button>
+      <div class="cat-page-title-wrap">
+        <span class="cat-page-emoji-badge" id="catPageEmoji">✨</span>
+        <div>
+          <h1 class="cat-page-title" id="catPageTitle">Category</h1>
+          <p class="cat-page-subtitle" id="catPageSubtitle">Loading products...</p>
+        </div>
+      </div>
+      <div class="cat-page-header-actions">
+        <button class="cat-page-search-toggle" id="catPageSearchToggle" aria-label="Search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search Bar (hidden by default, toggles) -->
+    <div class="cat-page-search-bar" id="catPageSearchBar">
+      <div class="cat-search-input-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="catPageSearchInput" class="cat-search-input" placeholder="Search in this category...">
+        <button class="cat-search-clear-btn" id="catSearchClearBtn">✕</button>
+      </div>
+    </div>
+
+    <!-- Sort / Filter Bar -->
+    <div class="cat-page-filter-bar">
+      <span class="cat-filter-label">Sort by:</span>
+      <div class="cat-sort-pills">
+        <button class="cat-sort-pill active" data-sort="featured">⭐ Featured</button>
+        <button class="cat-sort-pill" data-sort="price-low">₹ Low to High</button>
+        <button class="cat-sort-pill" data-sort="price-high">₹ High to Low</button>
+        <button class="cat-sort-pill" data-sort="rating">★ Top Rated</button>
+        <button class="cat-sort-pill" data-sort="newest">🆕 Newest</button>
+      </div>
+    </div>
+
+    <!-- Products Grid -->
+    <div class="cat-page-body">
+      <div class="cat-page-products-grid" id="catPageProductsGrid">
+        <!-- Products injected by JS -->
+      </div>
+      <!-- Empty State -->
+      <div class="cat-page-empty" id="catPageEmpty" style="display:none;">
+        <div class="cat-empty-icon">🔍</div>
+        <h3>No products found</h3>
+        <p>Try a different search or check back soon!</p>
+        <button class="cat-empty-clear-btn" id="catEmptyClearBtn">Clear Search</button>
+      </div>
+    </div>
+  </div>
+
+
   <!-- ============================================ -->
   <div class="customer-modal-backdrop" id="customerAuthModal" aria-hidden="true">
     <div class="customer-modal-card">
@@ -1428,6 +1486,90 @@
           <span>Continue Shopping 🛍️</span>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- CUSTOMER CART & ONLINE CHECKOUT MODAL        -->
+  <!-- ============================================ -->
+  <div class="customer-modal-backdrop" id="storeCartModal" aria-hidden="true">
+    <div class="customer-modal-card" style="max-width: 580px;">
+      <button class="customer-modal-close" id="closeStoreCartModalBtn" aria-label="Close cart">✕</button>
+
+      <div class="auth-modal-header" style="margin-bottom: 16px;">
+        <div class="auth-header-sparkle-avatar">🛍️</div>
+        <h3 class="auth-modal-title">Your Mayza Mart Bag</h3>
+        <p class="auth-modal-subtitle">Handpicked cute finds, packaged with lots of love!</p>
+      </div>
+
+      <!-- Cart Items List -->
+      <div id="storeCartItemsList" style="max-height: 200px; overflow-y: auto; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px;">
+        <!-- Populated dynamically by app.js -->
+      </div>
+
+      <!-- Order Summary Card -->
+      <div style="background: #FFF5F7; border: 1.5px solid #FFD1DA; border-radius: 14px; padding: 14px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.88rem; color: #555;">
+          <span>Subtotal:</span>
+          <strong id="storeCartSubtotal" style="color: #38121C;">₹0</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.88rem; color: #555;">
+          <span>Delivery Charges:</span>
+          <strong id="storeCartShipping" style="color: #27ae60;">FREE</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-top: 1px solid #FFD1DA; padding-top: 8px; margin-top: 6px; font-size: 1.1rem;">
+          <strong style="color: #38121C;">Total to Pay:</strong>
+          <strong id="storeCartGrandTotal" style="color: #D9657B;">₹0</strong>
+        </div>
+      </div>
+
+      <!-- Delivery Checkout Details Form -->
+      <form id="storeCheckoutForm" class="customer-auth-form">
+        <h4 style="margin: 0 0 10px; font-size: 0.95rem; color: #38121C; font-weight: 700;">📍 Shipping &amp; Contact Details</h4>
+        
+        <div class="auth-input-group">
+          <label for="checkoutCustName">Full Name</label>
+          <div class="auth-input-field-wrap">
+            <span class="auth-field-icon">👤</span>
+            <input type="text" id="checkoutCustName" class="auth-input-control" placeholder="Your Name" required>
+          </div>
+        </div>
+
+        <div class="auth-input-group">
+          <label for="checkoutCustPhone">WhatsApp / Mobile Number</label>
+          <div class="auth-input-field-wrap">
+            <span class="auth-field-icon">📱</span>
+            <input type="tel" id="checkoutCustPhone" class="auth-input-control" placeholder="+91 9876543210" required>
+          </div>
+        </div>
+
+        <div class="auth-input-group">
+          <label for="checkoutCustAddress">Complete Delivery Address</label>
+          <div class="auth-input-field-wrap">
+            <span class="auth-field-icon">🏠</span>
+            <input type="text" id="checkoutCustAddress" class="auth-input-control" placeholder="House/Flat, Street, City, State, PIN" required>
+          </div>
+        </div>
+
+        <div class="auth-input-group">
+          <label for="checkoutPaymentMode">Payment Method</label>
+          <div class="auth-input-field-wrap">
+            <span class="auth-field-icon">💳</span>
+            <select id="checkoutPaymentMode" class="auth-input-control" style="cursor: pointer; background: transparent;">
+              <option value="Cash on Delivery (COD)">💵 Cash on Delivery (COD)</option>
+              <option value="UPI / QR (Instant)">📱 UPI • GPay / PhonePe / Paytm</option>
+              <option value="Online Card / NetBanking">💳 Debit / Credit Card</option>
+            </select>
+          </div>
+        </div>
+
+        <p class="auth-feedback-msg" id="checkoutFeedbackMsg"></p>
+
+        <button type="submit" class="auth-primary-submit-btn" id="placeOnlineOrderBtn">
+          <span>Place Order Now 💕</span>
+          <span class="btn-arrow">➔</span>
+        </button>
+      </form>
     </div>
   </div>
 

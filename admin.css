@@ -950,6 +950,24 @@ body.twilight-theme .secondary-btn {
   background: #FEE2E2;
 }
 
+.ghost-btn {
+  background: transparent;
+  border: 1px solid var(--border-glass-bright);
+  color: var(--text-muted);
+}
+
+body.twilight-theme .ghost-btn {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.ghost-btn:hover {
+  background: rgba(217, 101, 123, 0.06);
+  border-color: rgba(217, 101, 123, 0.3);
+  color: var(--color-rose-dark);
+}
+
+.text-danger { color: #DC2626 !important; }
+
 /* ---------------------------------------------------------
    KPI Aurora Cards Grid
    --------------------------------------------------------- */
@@ -2649,25 +2667,111 @@ body.twilight-theme .modal-header {
 
 /* Print CSS */
 @media print {
-  body * {
-    visibility: hidden !important;
+  @page {
+    size: A4 portrait;
+    margin: 8mm;
   }
-  .invoice-printable-sheet,
-  .invoice-printable-sheet * {
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    background-image: none !important;
+    color: #0f172a !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide app navigation and non-print UI */
+  .studio-header,
+  .studio-sidebar,
+  .studio-viewport,
+  .ambient-cosmos,
+  .studio-toast-rack,
+  .admin-lock-screen,
+  .modal-header,
+  .modal-actions-right,
+  .modal-close-btn,
+  .no-print,
+  button,
+  .studio-modal-overlay:not(.active) {
+    display: none !important;
+  }
+
+  /* Make the active modal unconstrained and static */
+  .studio-modal-overlay.active {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .studio-modal-overlay.active .studio-modal {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    transform: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .studio-modal-overlay.active .invoice-printable-sheet {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 800px !important;
+    margin: 0 auto !important;
+    padding: 12px !important;
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    background: #ffffff !important;
+  }
+
+  .studio-modal-overlay.active .invoice-printable-sheet * {
     visibility: visible !important;
   }
-  .invoice-printable-sheet {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 20px;
-    box-shadow: none;
-    background: #fff !important;
+
+  .inv-items-table {
+    border: 1px solid #cbd5e1 !important;
   }
-  .no-print {
-    display: none !important;
+
+  .inv-items-table th {
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+  }
+
+  .inv-box {
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  .inv-footer-note {
+    background: #fff1f5 !important;
+    border: 1px solid #ffe4ed !important;
   }
 }
 
@@ -3672,4 +3776,587 @@ body.twilight-theme .supabase-cloud-pill.connected {
   transform: scale(1.05);
 }
 
+/* =========================================================
+   INLINE CATEGORY CREATOR & CATEGORY FILTER PILL ACTIONS
+   ========================================================= */
+.field-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.inline-add-cat-btn {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--color-rose-dark);
+  background: #FFF0F3;
+  border: 1px solid rgba(217, 101, 123, 0.3);
+  border-radius: var(--radius-full);
+  padding: 2px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+body.twilight-theme .inline-add-cat-btn {
+  background: rgba(255, 94, 138, 0.15);
+  border-color: rgba(255, 94, 138, 0.35);
+  color: var(--color-rose);
+}
+
+.inline-add-cat-btn:hover {
+  background: var(--color-rose);
+  color: #FFFFFF;
+  border-color: var(--color-rose);
+  transform: translateY(-1px);
+}
+
+.inline-category-creator {
+  background: #FFF7F9;
+  border: 1.5px dashed rgba(217, 101, 123, 0.4);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: slideDownCat 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDownCat {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+body.twilight-theme .inline-category-creator {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(217, 101, 123, 0.5);
+}
+
+.inline-cat-inputs,
+.inline-cat-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cat-emoji-input {
+  width: 48px !important;
+  text-align: center;
+  padding: 8px 4px !important;
+  font-size: 1.15rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.cat-name-input {
+  flex: 2;
+  min-width: 140px;
+  font-size: 0.85rem !important;
+}
+
+.cat-subtitle-input {
+  flex: 2;
+  min-width: 140px;
+  font-size: 0.85rem !important;
+}
+
+.cat-image-input-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex: 3;
+  min-width: 200px;
+}
+
+.cat-image-url-input {
+  flex: 1;
+  font-size: 0.82rem !important;
+}
+
+.cat-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 11px;
+  background: rgba(217, 101, 123, 0.1);
+  border: 1px solid rgba(217, 101, 123, 0.3);
+  border-radius: var(--radius-sm);
+  color: #D9657B;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.cat-upload-btn:hover {
+  background: rgba(217, 101, 123, 0.2);
+  transform: translateY(-1px);
+}
+
+.cat-actions-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.cat-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(217, 101, 123, 0.2);
+  border-radius: var(--radius-sm);
+}
+
+body.twilight-theme .cat-preview-row {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.cat-preview-thumb-wrap {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #f8f9fa;
+  flex-shrink: 0;
+}
+
+.cat-preview-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cat-preview-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.cat-preview-remove:hover {
+  background: #ff4757;
+}
+
+.cat-preview-hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.cat-save-btn {
+  padding: 8px 14px !important;
+  font-size: 0.78rem !important;
+  white-space: nowrap;
+  border-radius: var(--radius-sm) !important;
+}
+
+.cat-cancel-btn {
+  padding: 8px 10px !important;
+  font-size: 0.85rem !important;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm) !important;
+}
+
+.cat-cancel-btn:hover {
+  color: #ff4757;
+}
+
+.inline-cat-feedback {
+  font-size: 0.72rem;
+  color: #e84118;
+  min-height: 14px;
+  display: none;
+}
+
+.inline-cat-feedback.visible {
+  display: block;
+}
+
+/* Category Filter Pill Custom Delete Button */
+.pill-del-btn {
+  margin-left: 6px;
+  opacity: 0.6;
+  font-size: 0.95rem;
+  font-weight: 900;
+  padding: 0 4px;
+  border-radius: 50%;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.pill-del-btn:hover {
+  opacity: 1;
+  background: rgba(255, 71, 87, 0.2);
+  color: #ff4757;
+  transform: scale(1.1);
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* =========================================================
+   MANAGE CATEGORIES MODAL STYLES
+   ========================================================= */
+.manage-cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.manage-cat-thumb {
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  background: #f5f5f5;
+  aspect-ratio: 4/3;
+  display: flex;
+  flex-direction: column;
+}
+
+.manage-cat-thumb:hover {
+  border-color: rgba(217, 101, 123, 0.6);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(217, 101, 123, 0.18);
+}
+
+.manage-cat-thumb.selected {
+  border-color: #D9657B;
+  box-shadow: 0 0 0 3px rgba(217, 101, 123, 0.3);
+}
+
+.manage-cat-thumb img {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  display: block;
+}
+
+.manage-cat-thumb-label {
+  padding: 6px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.95);
+  text-align: center;
+  line-height: 1.2;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.twilight-theme .manage-cat-thumb-label {
+  background: rgba(30, 20, 45, 0.92);
+  color: #e0d0e8;
+}
+
+.manage-cat-thumb-edit-icon {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  color: #fff;
+}
+
+.manage-cat-thumb:hover .manage-cat-thumb-edit-icon {
+  opacity: 1;
+}
+
+/* Edit Panel */
+.manage-cat-edit-panel {
+  border: 1.5px solid rgba(217, 101, 123, 0.3);
+  border-radius: 16px;
+  padding: 18px;
+  background: rgba(255, 247, 249, 0.6);
+  animation: slideDownCat 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  margin-top: 8px;
+}
+
+body.twilight-theme .manage-cat-edit-panel {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(217, 101, 123, 0.4);
+}
+
+.manage-cat-edit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.manage-cat-edit-body {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 580px) {
+  .manage-cat-edit-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.manage-cat-big-preview {
+  width: 100%;
+  aspect-ratio: 4/3;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  background: #eee;
+  border: 1.5px solid rgba(0, 0, 0, 0.08);
+}
+
+.manage-cat-big-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.manage-cat-preview-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(transparent, rgba(0,0,0,0.65));
+  padding: 12px 10px 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.manage-cat-edit-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+#manageCatFeedback {
+  margin-top: 8px;
+}
+
+#manageCatFeedback.visible {
+  display: block;
+}
+
+/* Default-category badge */
+.manage-cat-thumb-default-badge {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  background: rgba(39, 174, 96, 0.85);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+/* =========================================================
+   IN-STORE POS BILLING & CHANNEL STYLES
+   ========================================================= */
+.pos-prod-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: all 0.15s ease;
+}
+
+.pos-prod-card:hover {
+  background: rgba(217, 101, 123, 0.08);
+  border-color: rgba(217, 101, 123, 0.3);
+}
+
+.pos-prod-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pos-prod-thumb {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #eee;
+}
+
+.pos-prod-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.pos-prod-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.pos-prod-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.pos-add-btn {
+  background: rgba(217, 101, 123, 0.12);
+  color: #D9657B;
+  border: 1px solid rgba(217, 101, 123, 0.3);
+  border-radius: 8px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pos-add-btn:hover {
+  background: #D9657B;
+  color: #fff;
+  transform: scale(1.04);
+}
+
+/* POS Cart Row */
+.pos-cart-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  font-size: 0.82rem;
+}
+
+.pos-cart-qty-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pos-qty-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.85rem;
+  transition: all 0.15s ease;
+}
+
+.pos-qty-btn:hover {
+  background: rgba(217, 101, 123, 0.15);
+  border-color: #D9657B;
+  color: #D9657B;
+}
+
+.pos-del-item-btn {
+  background: none;
+  border: none;
+  color: #ff4757;
+  cursor: pointer;
+  font-size: 0.95rem;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+  padding: 0 4px;
+}
+
+.pos-del-item-btn:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+/* Order Channel Badges */
+.channel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.channel-online {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563EB;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.channel-pos {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+/* Delete Order Row Button */
+.row-btn.delete-order-btn {
+  background: rgba(255, 71, 87, 0.1);
+  color: #ff4757;
+  border-color: rgba(255, 71, 87, 0.25);
+}
+
+.row-btn.delete-order-btn:hover {
+  background: #ff4757;
+  color: #fff;
+  border-color: #ff4757;
+}
 

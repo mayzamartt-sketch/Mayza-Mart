@@ -529,9 +529,9 @@
                 <span class="btn-icon">📥</span>
                 <span>Export CSV</span>
               </button>
-              <button class="action-btn primary-glow-btn" id="simulateOrderBtn">
-                <span class="btn-icon">⚡</span>
-                <span>Simulate New Order</span>
+              <button class="action-btn primary-glow-btn" id="openInStoreBillModalBtn">
+                <span class="btn-icon">🧾</span>
+                <span>➕ In-Store POS Bill</span>
               </button>
             </div>
           </div>
@@ -605,6 +605,10 @@
               <button class="action-btn secondary-btn" id="stockAlertsFilterBtn">
                 <span class="btn-icon">⚠️</span>
                 <span>Low Stock Alert (3)</span>
+              </button>
+              <button class="action-btn secondary-btn" id="manageCategoriesBtn">
+                <span class="btn-icon">🖼️</span>
+                <span>Manage Categories</span>
               </button>
               <button class="action-btn primary-glow-btn" id="openAddProductModalBtn">
                 <span class="btn-icon">＋</span>
@@ -953,6 +957,178 @@
 
 
   <!-- ============================================ -->
+  <!-- MODAL: MANAGE CATEGORIES & IMAGES            -->
+  <!-- ============================================ -->
+  <div class="studio-modal-overlay" id="manageCategoriesModal" aria-hidden="true">
+    <div class="studio-modal glass-card" style="max-width:760px; width:96vw;">
+      <div class="modal-header">
+        <div class="modal-title-lockup">
+          <span class="modal-badge-sparkle">🖼️</span>
+          <h3 class="modal-title">Manage Store Categories &amp; Images</h3>
+        </div>
+        <button class="modal-close-btn" id="closeManageCategoriesBtn">&times;</button>
+      </div>
+      <div class="modal-body" style="padding:0 24px 24px;">
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:18px;">
+          Click any category card to update its picture, name, and subtitle as shown in the live store.
+        </p>
+
+        <!-- Categories Grid -->
+        <div class="manage-cat-grid" id="manageCatGrid">
+          <!-- Dynamically populated by admin.js -->
+        </div>
+
+        <!-- Inline Edit Panel (shown when a card is selected) -->
+        <div class="manage-cat-edit-panel hidden" id="manageCatEditPanel">
+          <div class="manage-cat-edit-header">
+            <span id="manageCatEditTitle">Editing: <strong id="manageCatEditName"></strong></span>
+            <button type="button" class="modal-close-btn" id="closeCatEditPanelBtn" style="position:static; font-size:1.1rem;">×</button>
+          </div>
+          <div class="manage-cat-edit-body">
+            <div class="manage-cat-preview-col">
+              <div class="manage-cat-big-preview">
+                <img id="manageCatPreviewImg" src="" alt="Category preview">
+                <div class="manage-cat-preview-overlay">
+                  <span id="manageCatPreviewName"></span>
+                </div>
+              </div>
+            </div>
+            <div class="manage-cat-fields-col">
+              <div class="form-group">
+                <label>Category Name</label>
+                <input type="text" id="manageCatNameInput" class="studio-input" placeholder="Category name" maxlength="40">
+              </div>
+              <div class="form-group">
+                <label>Subtitle <span style="opacity:0.55;">(shown in store)</span></label>
+                <input type="text" id="manageCatSubtitleInput" class="studio-input" placeholder="e.g. Style in every strand" maxlength="50">
+              </div>
+              <div class="form-group">
+                <label>Emoji Icon</label>
+                <input type="text" id="manageCatEmojiInput" class="studio-input" placeholder="e.g. 🎀" maxlength="2" style="width:70px;">
+              </div>
+              <div class="form-group">
+                <label>Image URL <span style="opacity:0.55;">(paste a link or upload below)</span></label>
+                <input type="text" id="manageCatImageUrl" class="studio-input" placeholder="https://... or assets/cat-hair.jpg">
+              </div>
+              <div class="form-group">
+                <label>Upload Image from Device</label>
+                <label class="cat-upload-btn" style="width:fit-content;">
+                  <input type="file" id="manageCatImageFile" accept="image/*" style="display:none;">
+                  <span>📷 Choose Image</span>
+                </label>
+              </div>
+              <div class="manage-cat-edit-actions">
+                <button type="button" class="action-btn primary-glow-btn" id="saveCatChangesBtn">
+                  <span>💾 Save Changes</span>
+                </button>
+                <button type="button" class="action-btn secondary-btn" id="cancelCatChangesBtn">Cancel</button>
+              </div>
+              <div class="inline-cat-feedback" id="manageCatFeedback"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- MODAL: IN-STORE POS BILLING & ORDER CREATOR  -->
+  <!-- ============================================ -->
+  <div class="studio-modal-overlay" id="inStoreBillModal" aria-hidden="true">
+    <div class="studio-modal glass-card" style="max-width: 880px; width: 96vw;">
+      <div class="modal-header">
+        <div class="modal-title-lockup">
+          <span class="modal-badge-sparkle">🧾</span>
+          <h3 class="modal-title">In-Store POS Customer Billing</h3>
+        </div>
+        <button class="modal-close-btn" id="closeInStoreBillBtn">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 0 24px 24px;">
+        <form id="posBillForm">
+          
+          <!-- Top Row: Customer Info -->
+          <div class="pos-cust-bar" style="background: rgba(217, 101, 123, 0.06); border: 1px solid rgba(217, 101, 123, 0.2); border-radius: 14px; padding: 14px 18px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: block;">Customer Name</label>
+                <input type="text" id="posCustName" class="studio-input" placeholder="e.g. Walk-in Customer / Aisha" value="Walk-in Customer" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: block;">Phone / WhatsApp (Optional)</label>
+                <input type="tel" id="posCustPhone" class="studio-input" placeholder="+91 98765 43210">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.78rem; font-weight: 700; color: var(--text-primary); margin-bottom: 4px; display: block;">Payment Mode</label>
+                <select id="posPaymentMode" class="studio-input" style="cursor: pointer;">
+                  <option value="Cash • In-Store">💵 Cash</option>
+                  <option value="UPI / QR (GPay/PhonePe)">📱 UPI / QR Code</option>
+                  <option value="Card (POS Terminal)">💳 Card / POS Machine</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Product Picker & Live Cart Grid -->
+          <div class="pos-content-grid" style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 20px; align-items: start;">
+            
+            <!-- Left: Product Matrix Selector -->
+            <div class="pos-product-picker" style="border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; padding: 14px; background: rgba(255,255,255,0.6);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <strong style="font-size: 0.85rem; color: var(--text-primary);">🛍️ Pick Products from Catalog</strong>
+                <span id="posCatalogCount" style="font-size: 0.72rem; color: var(--text-muted);">0 available</span>
+              </div>
+              <input type="text" id="posProductSearch" class="studio-input" placeholder="🔍 Search product or category..." style="margin-bottom: 10px; font-size: 0.82rem;">
+              
+              <div class="pos-product-list" id="posProductList" style="max-height: 290px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+                <!-- Populated dynamically by admin.js -->
+              </div>
+            </div>
+
+            <!-- Right: Bill Cart Table & Calculations -->
+            <div class="pos-cart-panel" style="border: 1.5px solid rgba(217, 101, 123, 0.25); border-radius: 14px; padding: 14px; background: rgba(255, 255, 255, 0.85);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(0,0,0,0.06); padding-bottom: 8px;">
+                <strong style="font-size: 0.88rem; color: var(--text-primary);">🧾 Current Bill Items (<span id="posCartItemCount">0</span>)</strong>
+                <button type="button" id="posClearCartBtn" style="background: none; border: none; font-size: 0.74rem; color: #ff4757; cursor: pointer; font-weight: 600;">Clear All</button>
+              </div>
+
+              <!-- Cart Items List -->
+              <div id="posCartItemsList" style="max-height: 190px; overflow-y: auto; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <!-- Populated dynamically -->
+              </div>
+
+              <!-- Bill Totals Summary -->
+              <div class="pos-totals-box" style="background: rgba(217, 101, 123, 0.05); border-radius: 10px; padding: 12px; margin-top: 10px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.82rem;">
+                  <span style="color: var(--text-muted);">Items Subtotal:</span>
+                  <strong id="posBillSubtotal" style="font-family: var(--font-brand);">₹0</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 0.82rem;">
+                  <span style="color: var(--text-muted);">Discount (₹):</span>
+                  <input type="number" id="posBillDiscount" class="studio-input" value="0" min="0" style="width: 80px; height: 26px; padding: 2px 6px; font-size: 0.8rem; text-align: right;">
+                </div>
+                <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(217, 101, 123, 0.2); padding-top: 8px; margin-top: 4px; font-size: 1.05rem;">
+                  <strong style="color: var(--text-primary);">Grand Total:</strong>
+                  <strong id="posBillGrandTotal" style="color: #D9657B; font-family: var(--font-brand); font-size: 1.2rem;">₹0</strong>
+                </div>
+              </div>
+
+              <!-- POS Actions -->
+              <div style="display: flex; gap: 10px; margin-top: 14px;">
+                <button type="submit" class="action-btn primary-glow-btn" id="posSubmitBillBtn" style="flex: 1; justify-content: center;">
+                  <span>✨ Complete Order &amp; Generate Bill</span>
+                </button>
+                <button type="button" class="action-btn secondary-btn" id="cancelInStoreBillBtn">Cancel</button>
+              </div>
+            </div>
+
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
   <!-- MODAL 1: ADD / EDIT PRODUCT MODAL           -->
   <!-- ============================================ -->
   <div class="studio-modal-overlay" id="productModal" aria-hidden="true">
@@ -975,7 +1151,10 @@
           </div>
 
           <div class="form-group">
-            <label for="prodCategory">Category *</label>
+            <div class="field-label-row">
+              <label for="prodCategory">Category *</label>
+              <button type="button" class="inline-add-cat-btn" id="toggleAddCategoryBtn">＋ New Category</button>
+            </div>
             <select id="prodCategory" class="studio-input" required>
               <option value="Hair Accessories">🎀 Hair Accessories</option>
               <option value="Return Gifts">🎁 Return Gifts</option>
@@ -984,7 +1163,37 @@
               <option value="Stationery">✏️ Stationery</option>
               <option value="Home &amp; Lifestyle">🏠 Home &amp; Lifestyle</option>
               <option value="Jewellery &amp; Fashion">💎 Jewellery &amp; Fashion</option>
+              <option value="__create_new__">＋ Add New Category...</option>
             </select>
+            <!-- Inline Add Category Box -->
+            <div class="inline-category-creator hidden" id="inlineCategoryBox">
+              <div class="inline-cat-row">
+                <input type="text" id="inlineCategoryEmoji" class="studio-input cat-emoji-input" placeholder="✨" value="✨" maxlength="2" title="Pick an emoji for the category">
+                <input type="text" id="inlineCategoryName" class="studio-input cat-name-input" placeholder="Category name (e.g. Baby Care)" maxlength="40">
+                <input type="text" id="inlineCategorySubtitle" class="studio-input cat-subtitle-input" placeholder="Subtitle (e.g. Cute essentials)" maxlength="50">
+              </div>
+              <div class="inline-cat-row">
+                <div class="cat-image-input-group">
+                  <input type="text" id="inlineCategoryImageUrl" class="studio-input cat-image-url-input" placeholder="Image URL (e.g. https://... or assets/cat-xyz.jpg)">
+                  <label class="cat-upload-btn" title="Upload category image">
+                    <input type="file" id="inlineCategoryImageFile" accept="image/*" style="display:none;">
+                    <span>📷 Upload</span>
+                  </label>
+                </div>
+                <div class="cat-actions-group">
+                  <button type="button" class="action-btn primary-glow-btn cat-save-btn" id="saveInlineCategoryBtn">Add Category</button>
+                  <button type="button" class="action-btn secondary-btn cat-cancel-btn" id="cancelInlineCategoryBtn">✕</button>
+                </div>
+              </div>
+              <div class="cat-preview-row" id="inlineCategoryPreviewRow" style="display:none;">
+                <div class="cat-preview-thumb-wrap">
+                  <img id="inlineCategoryPreviewImg" src="" alt="Category preview" class="cat-preview-thumb">
+                  <button type="button" class="cat-preview-remove" id="inlineCategoryRemoveImg" title="Remove image">✕</button>
+                </div>
+                <span class="cat-preview-hint">Image preview for live store category card</span>
+              </div>
+              <span class="inline-cat-feedback" id="inlineCategoryFeedback"></span>
+            </div>
           </div>
 
           <div class="form-group">
@@ -1242,7 +1451,10 @@
           </div>
 
           <div class="form-group">
-            <label for="wsCategory">Category *</label>
+            <div class="field-label-row">
+              <label for="wsCategory">Category *</label>
+              <button type="button" class="inline-add-cat-btn" id="toggleWsAddCategoryBtn">＋ New Category</button>
+            </div>
             <select id="wsCategory" class="studio-input" required>
               <option value="Hair Accessories">🎀 Hair Accessories</option>
               <option value="Return Gifts">🎁 Return Gifts</option>
@@ -1251,7 +1463,37 @@
               <option value="Stationery">✏️ Stationery</option>
               <option value="Home &amp; Lifestyle">🏠 Home &amp; Lifestyle</option>
               <option value="Jewellery &amp; Fashion">💎 Jewellery &amp; Fashion</option>
+              <option value="__create_new__">＋ Add New Category...</option>
             </select>
+            <!-- Inline Add Category Box for Wholesale -->
+            <div class="inline-category-creator hidden" id="wsInlineCategoryBox">
+              <div class="inline-cat-row">
+                <input type="text" id="wsInlineCategoryEmoji" class="studio-input cat-emoji-input" placeholder="✨" value="✨" maxlength="2" title="Pick an emoji for the category">
+                <input type="text" id="wsInlineCategoryName" class="studio-input cat-name-input" placeholder="Category name (e.g. Baby Care)" maxlength="40">
+                <input type="text" id="wsInlineCategorySubtitle" class="studio-input cat-subtitle-input" placeholder="Subtitle (e.g. Cute essentials)" maxlength="50">
+              </div>
+              <div class="inline-cat-row">
+                <div class="cat-image-input-group">
+                  <input type="text" id="wsInlineCategoryImageUrl" class="studio-input cat-image-url-input" placeholder="Image URL (e.g. https://... or assets/cat-xyz.jpg)">
+                  <label class="cat-upload-btn" title="Upload category image">
+                    <input type="file" id="wsCategoryImageFile" accept="image/*" style="display:none;">
+                    <span>📷 Upload</span>
+                  </label>
+                </div>
+                <div class="cat-actions-group">
+                  <button type="button" class="action-btn primary-glow-btn cat-save-btn" id="saveWsInlineCategoryBtn">Add Category</button>
+                  <button type="button" class="action-btn secondary-btn cat-cancel-btn" id="cancelWsInlineCategoryBtn">✕</button>
+                </div>
+              </div>
+              <div class="cat-preview-row" id="wsCategoryPreviewRow" style="display:none;">
+                <div class="cat-preview-thumb-wrap">
+                  <img id="wsCategoryPreviewImg" src="" alt="Category preview" class="cat-preview-thumb">
+                  <button type="button" class="cat-preview-remove" id="wsCategoryRemoveImg" title="Remove image">✕</button>
+                </div>
+                <span class="cat-preview-hint">Image preview for live store category card</span>
+              </div>
+              <span class="inline-cat-feedback" id="wsInlineCategoryFeedback"></span>
+            </div>
           </div>
 
           <div class="form-group">

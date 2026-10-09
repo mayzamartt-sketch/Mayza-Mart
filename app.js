@@ -212,6 +212,13 @@ class CuteSoundEngine {
   }
 }
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, m => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[m]));
+}
+
 // Master Animation Controller
 class MayzaEntranceApp {
   constructor() {
@@ -747,8 +754,9 @@ class MayzaEntranceApp {
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    // Refresh live announcement banner, active coupons, and product matrix from Supabase
+    // Refresh live announcement banner, active coupons, categories, and product matrix from Supabase
     this.syncLiveBannersAndCoupons();
+    this.syncLiveCategories();
     this.syncLiveProducts();
   }
 
@@ -777,8 +785,9 @@ class MayzaEntranceApp {
     // Initialize Customer Authentication & Dashboard Gateway
     this.initCustomerAuthAndDashboard();
 
-    // Sync live announcement banner, coupons, and products from Supabase & Admin in real time
+    // Sync live announcement banner, coupons, categories, and products from Supabase & Admin in real time
     this.syncLiveBannersAndCoupons();
+    this.syncLiveCategories();
     this.syncLiveProducts();
   }
 
@@ -794,14 +803,14 @@ class MayzaEntranceApp {
     }
 
     const defaultCatalog = [
-      { id: 'def-1', title: 'Cute Hair Clips Set (Pack of 12)', price: 249, rating: '4.8', tag: 'Best Seller', image: 'assets/p-clips.jpg' },
-      { id: 'def-2', title: 'Unicorn Return Gift Box (Set of 5)', price: 299, rating: '4.7', tag: 'Best Seller', image: 'assets/p-giftbox.jpg' },
-      { id: 'def-3', title: 'Mini Handbag (Kids & Teens)', price: 349, rating: '4.6', tag: 'New', image: 'assets/p-handbag.jpg' },
-      { id: 'def-4', title: 'Scented Candle Gift Set', price: 499, rating: '4.8', tag: 'Best Seller', image: 'assets/p-candle.jpg' },
-      { id: 'def-5', title: 'Designer Scrunchies (Set of 5)', price: 199, rating: '4.7', tag: 'Best Seller', image: 'assets/p-scrunchies.jpg' },
-      { id: 'def-6', title: 'Cute Water Bottle (500ml)', price: 299, rating: '4.6', tag: 'New', image: 'assets/p-bottle.jpg' },
-      { id: 'def-7', title: 'Stationery Set (Unicorn Theme)', price: 349, rating: '4.8', tag: 'Best Seller', image: 'assets/cat-stationery.jpg' },
-      { id: 'def-8', title: 'Teddy Bear (Small)', price: 399, rating: '4.9', tag: 'Best Seller', image: 'assets/cat-toys.jpg' }
+      { id: 'def-1', title: 'Cute Hair Clips Set (Pack of 12)', category: 'Hair Accessories', price: 249, rating: '4.8', tag: 'Best Seller', image: 'assets/p-clips.jpg' },
+      { id: 'def-2', title: 'Unicorn Return Gift Box (Set of 5)', category: 'Return Gifts', price: 299, rating: '4.7', tag: 'Best Seller', image: 'assets/p-giftbox.jpg' },
+      { id: 'def-3', title: 'Mini Handbag (Kids & Teens)', category: 'Handbags & Purses', price: 349, rating: '4.6', tag: 'New', image: 'assets/p-handbag.jpg' },
+      { id: 'def-4', title: 'Scented Candle Gift Set', category: 'Home & Lifestyle', price: 499, rating: '4.8', tag: 'Best Seller', image: 'assets/p-candle.jpg' },
+      { id: 'def-5', title: 'Designer Scrunchies (Set of 5)', category: 'Hair Accessories', price: 199, rating: '4.7', tag: 'Best Seller', image: 'assets/p-scrunchies.jpg' },
+      { id: 'def-6', title: 'Cute Water Bottle (500ml)', category: 'Home & Lifestyle', price: 299, rating: '4.6', tag: 'New', image: 'assets/p-bottle.jpg' },
+      { id: 'def-7', title: 'Stationery Set (Unicorn Theme)', category: 'Stationery', price: 349, rating: '4.8', tag: 'Best Seller', image: 'assets/cat-stationery.jpg' },
+      { id: 'def-8', title: 'Teddy Bear (Small)', category: 'Toys', price: 399, rating: '4.9', tag: 'Best Seller', image: 'assets/cat-toys.jpg' }
     ];
 
     const escapeHtml = (str) => {
@@ -827,7 +836,7 @@ class MayzaEntranceApp {
         const rating = p.rating || '4.8';
 
         return `
-          <article class="product-item-card" data-name="${escapeHtml(p.title)}" data-id="${escapeHtml(p.id)}">
+          <article class="product-item-card" data-name="${escapeHtml(p.title)}" data-id="${escapeHtml(p.id)}" data-category="${escapeHtml(p.category || '')}">
             <div class="prod-card-media">
               <img src="${escapeHtml(imgSrc)}" alt="${escapeHtml(p.title)}" loading="lazy" onerror="this.onerror=null; this.src='assets/p-clips.jpg';">
               <span class="${badgeClass}">${escapeHtml(tag)}</span>
@@ -897,26 +906,522 @@ class MayzaEntranceApp {
     }
   }
 
+  // =========================================================
+  // LIVE STORE CATEGORIES REAL-TIME SYNC
+  // =========================================================
+  syncLiveCategories() {
+    const strip = document.getElementById('storeCategoryStrip') || document.querySelector('.glass-category-strip');
+    const grid = document.getElementById('storeCategoryCardsGrid') || document.querySelector('.category-cards-grid');
+
+    const defaultCategories = [
+      { name: "Return Gifts", emoji: "🎁", image: "assets/cat-return-gifts.jpg", subtitle: "Make it memorable", colorClass: "bg-sec" },
+      { name: "Hair Accessories", emoji: "🎀", image: "assets/cat-hair.jpg", subtitle: "Style in every strand", colorClass: "bg-acc" },
+      { name: "Clips & Hair Bands", emoji: "🌸", image: "assets/p-clips.jpg", subtitle: "Cute & trendy", colorClass: "bg-lav" },
+      { name: "Handbags & Purses", emoji: "🛍️", image: "assets/cat-bags.jpg", subtitle: "Carry your style", colorClass: "bg-sec" },
+      { name: "Toys", emoji: "🧸", image: "assets/cat-toys.jpg", subtitle: "Fun for all ages", colorClass: "bg-sky" },
+      { name: "Stationery", emoji: "✏️", image: "assets/cat-stationery.jpg", subtitle: "Write • Create • Dream", colorClass: "bg-lav" },
+      { name: "Home & Lifestyle", emoji: "🏠", image: "assets/cat-home.jpg", subtitle: "Make it cozy", colorClass: "bg-pea" },
+      { name: "Jewellery & Fashion", emoji: "💎", image: "assets/cat-jewellery.jpg", subtitle: "Accessorize your style", colorClass: "bg-acc" },
+      { name: "Party Supplies", emoji: "🎉", image: "assets/cat-party.jpg", subtitle: "Celebrate in style", colorClass: "bg-sec" },
+      { name: "Phone Accessories", emoji: "📱", image: "assets/cat-phone.jpg", subtitle: "Stay connected", colorClass: "bg-sky" }
+    ];
+
+    const escapeHtml = (str) => {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    };
+
+    let customCats = [];
+    try {
+      const stored = localStorage.getItem('mm_custom_categories');
+      if (stored) customCats = JSON.parse(stored);
+    } catch (e) {}
+
+    const colorCycle = ['bg-sec', 'bg-acc', 'bg-lav', 'bg-sky', 'bg-pea'];
+    const formattedCustom = (Array.isArray(customCats) ? customCats : []).map((c, idx) => ({
+      name: c.name,
+      emoji: c.emoji || "✨",
+      image: c.image || "assets/cat-return-gifts.jpg",
+      subtitle: c.subtitle || "Handpicked finds",
+      colorClass: c.colorClass || colorCycle[idx % colorCycle.length],
+      isCustom: true
+    }));
+
+    const defaultNames = new Set(defaultCategories.map(d => d.name.toLowerCase().trim()));
+
+    // Apply any admin overrides to default categories (from Manage Categories modal)
+    try {
+      const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+      if (Object.keys(overrides).length > 0) {
+        defaultCategories.forEach(cat => {
+          const ov = overrides[cat.name];
+          if (ov) {
+            if (ov.image) cat.image = ov.image;
+            if (ov.subtitle) cat.subtitle = ov.subtitle;
+            if (ov.emoji) cat.emoji = ov.emoji;
+          }
+        });
+      }
+    } catch(e) {}
+    const uniqueCustom = formattedCustom.filter(c => !defaultNames.has((c.name || '').toLowerCase().trim()));
+    const allCategories = [...defaultCategories, ...uniqueCustom];
+
+    // 1. Render Category Strip (Horizontal pill bar)
+    if (strip) {
+      strip.innerHTML = allCategories.map(c => `
+        <a href="#bestsellers" class="cat-pill-btn" data-category="${escapeHtml(c.name)}">
+          <span class="cat-icon-circle ${c.colorClass || 'bg-sec'}">${escapeHtml(c.emoji || '✨')}</span>
+          <span class="cat-label">${escapeHtml(c.name)}</span>
+        </a>
+      `).join('') + `
+        <a href="#bestsellers" class="cat-pill-btn" data-category="all">
+          <span class="cat-icon-circle bg-sec">✨</span>
+          <span class="cat-label">All Categories</span>
+        </a>
+      `;
+    }
+
+    // 2. Render Category Cards Grid (Explore Our Categories)
+    if (grid) {
+      grid.innerHTML = allCategories.map(c => {
+        const imgSrc = c.image || 'assets/cat-return-gifts.jpg';
+        return `
+          <a href="#bestsellers" class="cat-product-card" data-category="${escapeHtml(c.name)}">
+            <div class="cat-card-media">
+              <img src="${escapeHtml(imgSrc)}" alt="${escapeHtml(c.name)}" loading="lazy" onerror="this.onerror=null; this.src='assets/cat-return-gifts.jpg';">
+              <span class="cat-card-arrow">➔</span>
+            </div>
+            <div class="cat-card-info">
+              <h3>${escapeHtml(c.name)}</h3>
+              <p>${escapeHtml(c.subtitle || 'Explore collection')}</p>
+            </div>
+          </a>
+        `;
+      }).join('');
+    }
+
+    // 3. Bind click events on category links to filter products in bestsellers
+    this.bindCategoryFilterClicks();
+
+    // 4. Setup listeners for real-time updates from Admin or another tab
+    if (!this.hasCategoryListeners) {
+      this.hasCategoryListeners = true;
+      window.addEventListener('mayza:categories-updated', () => {
+        this.syncLiveCategories();
+      });
+      window.addEventListener('storage', (e) => {
+        if (e.key === 'mm_custom_categories' || e.key === 'mm_categories_timestamp') {
+          this.syncLiveCategories();
+        }
+      });
+    }
+  }
+
+  bindCategoryFilterClicks() {
+    const emojiMap = {
+      'hair accessories': '🎀',
+      'return gifts': '🎁',
+      'clips & hair bands': '🌸',
+      'handbags & purses': '🛍️',
+      'handbags': '🛍️',
+      'toys': '🧸',
+      'stationery': '✏️',
+      'home & lifestyle': '🏠',
+      'home': '🏠',
+      'jewellery & fashion': '💎',
+      'jewellery': '💎',
+      'party supplies': '🎉',
+      'phone accessories': '📱',
+      'phone charm': '✨',
+      'charms': '✨'
+    };
+
+    // When ANY category card/pill is clicked → open the full-screen category page
+    document.querySelectorAll('.cat-pill-btn, .cat-product-card').forEach(btn => {
+      // Remove old listeners cleanly by cloning
+      const fresh = btn.cloneNode(true);
+      btn.parentNode.replaceChild(fresh, btn);
+
+      fresh.addEventListener('click', (e) => {
+        // Extract category name with fallbacks
+        const rawCat = fresh.getAttribute('data-category')
+          || fresh.querySelector('.cat-label')?.textContent
+          || fresh.querySelector('h3')?.textContent
+          || fresh.textContent
+          || '';
+        const cat = rawCat.trim();
+        const catLower = cat.toLowerCase();
+
+        // If "more" or "all", scroll smoothly to categories section
+        if (catLower === 'more' || catLower === 'all' || catLower === 'view all categories') {
+          e.preventDefault();
+          const target = document.getElementById('categories') || document.getElementById('bestsellers');
+          if (target) target.scrollIntoView({ behavior: 'smooth' });
+          return;
+        }
+
+        if (!cat) return;
+        e.preventDefault();
+
+        // Extract or lookup emoji
+        const circleEmoji = fresh.querySelector('.cat-icon-circle')?.textContent.trim();
+        const emoji = circleEmoji || emojiMap[catLower] || '✨';
+
+        this.openCategoryPage(cat, emoji);
+      });
+    });
+  }
+
+  // ── CATEGORY PAGE ENGINE ──────────────────────────────────────
+  _catPageProducts = [];   // full list for current category
+  _catPageSort     = 'featured';
+  _catPageSearch   = '';
+
+  openCategoryPage(categoryName, emoji = '✨') {
+    const overlay = document.getElementById('categoryPageOverlay');
+    if (!overlay) return;
+
+    // Reset state
+    this._catPageSort   = 'featured';
+    this._catPageSearch = '';
+
+    // Update header
+    const emojiEl = document.getElementById('catPageEmoji');
+    const titleEl = document.getElementById('catPageTitle');
+    const subEl   = document.getElementById('catPageSubtitle');
+    if (emojiEl) emojiEl.textContent = emoji;
+    if (titleEl) titleEl.textContent = categoryName;
+    if (subEl)   subEl.textContent   = 'Loading products...';
+
+    // Reset sort pills
+    document.querySelectorAll('.cat-sort-pill').forEach(p => p.classList.remove('active'));
+    const featuredPill = document.querySelector('.cat-sort-pill[data-sort="featured"]');
+    if (featuredPill) featuredPill.classList.add('active');
+
+    // Reset search
+    const searchBar    = document.getElementById('catPageSearchBar');
+    const searchInput  = document.getElementById('catPageSearchInput');
+    const searchToggle = document.getElementById('catPageSearchToggle');
+    if (searchBar) searchBar.classList.remove('open');
+    if (searchInput) searchInput.value = '';
+    if (searchToggle) searchToggle.classList.remove('active');
+
+    // Gather products from all known sources (localStorage, defaultCatalog, DOM)
+    this._catPageProducts = this._gatherCategoryProducts(categoryName);
+
+    // Open overlay with smooth animation
+    overlay.classList.add('active');
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+
+    // Push browser history state for seamless native back button experience
+    try {
+      history.pushState({ mayzaCategoryPage: true, category: categoryName }, '');
+    } catch(err) {}
+
+    // Play subtle chime
+    try { this.sound?.playSparkleChime(); } catch(err) {}
+
+    // Render products
+    this._renderCatPageProducts();
+
+    // Wire events (once)
+    if (!overlay._catEventsWired) {
+      overlay._catEventsWired = true;
+      this._wireCatPageEvents();
+    }
+  }
+
+  closeCategoryPage() {
+    const overlay = document.getElementById('categoryPageOverlay');
+    if (!overlay || !overlay.classList.contains('active')) return;
+
+    overlay.classList.remove('active');
+    overlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+
+    try { this.sound?.playClick(); } catch(err) {}
+  }
+
+  _gatherCategoryProducts(categoryName) {
+    const rawCat = (categoryName || '').trim();
+    const activeCat = rawCat.toLowerCase();
+    const products = [];
+    const seenTitles = new Set();
+
+    // Source A: localStorage 'mm_products'
+    let storedProducts = [];
+    try {
+      const stored = localStorage.getItem('mm_products');
+      if (stored) storedProducts = JSON.parse(stored);
+    } catch (e) {}
+
+    // Source B: default catalog
+    const defaultCatalog = [
+      { id: 'def-1', title: 'Cute Hair Clips Set (Pack of 12)', category: 'Hair Accessories', price: 249, rating: 4.8, tag: 'Best Seller', image: 'assets/p-clips.jpg' },
+      { id: 'def-2', title: 'Unicorn Return Gift Box (Set of 5)', category: 'Return Gifts', price: 299, rating: 4.7, tag: 'Best Seller', image: 'assets/p-giftbox.jpg' },
+      { id: 'def-3', title: 'Mini Handbag (Kids & Teens)', category: 'Handbags & Purses', price: 349, rating: 4.6, tag: 'New', image: 'assets/p-handbag.jpg' },
+      { id: 'def-4', title: 'Scented Candle Gift Set', category: 'Home & Lifestyle', price: 499, rating: 4.8, tag: 'Best Seller', image: 'assets/p-candle.jpg' },
+      { id: 'def-5', title: 'Designer Scrunchies (Set of 5)', category: 'Hair Accessories', price: 199, rating: 4.7, tag: 'Best Seller', image: 'assets/p-scrunchies.jpg' },
+      { id: 'def-6', title: 'Cute Water Bottle (500ml)', category: 'Home & Lifestyle', price: 299, rating: 4.6, tag: 'New', image: 'assets/p-bottle.jpg' },
+      { id: 'def-7', title: 'Stationery Set (Unicorn Theme)', category: 'Stationery', price: 349, rating: 4.8, tag: 'Best Seller', image: 'assets/cat-stationery.jpg' },
+      { id: 'def-8', title: 'Teddy Bear (Small)', category: 'Toys', price: 399, rating: 4.9, tag: 'Best Seller', image: 'assets/cat-toys.jpg' }
+    ];
+
+    const allCatalog = Array.isArray(storedProducts) && storedProducts.length > 0
+      ? [...storedProducts, ...defaultCatalog]
+      : defaultCatalog;
+
+    // Helper: fuzzy matching
+    const isCatMatch = (prodCat, prodTitle) => {
+      const c = (prodCat || '').toLowerCase().trim();
+      const t = (prodTitle || '').toLowerCase().trim();
+      if (!activeCat) return true;
+      if (c === activeCat) return true;
+      if (c && (activeCat.includes(c) || c.includes(activeCat))) return true;
+      if (t.includes(activeCat)) return true;
+
+      // Match significant keywords (e.g., 'phone', 'charm', 'clips', 'hair', 'handbag', etc.)
+      const keywords = activeCat.split(/[\s,&+/]+/).filter(w => w.length > 2);
+      for (const w of keywords) {
+        if (c.includes(w) || t.includes(w)) return true;
+      }
+      return false;
+    };
+
+    // 1. Process catalog items
+    allCatalog.forEach(p => {
+      const title = p.title || p.name || 'Product';
+      const normTitle = title.toLowerCase().trim();
+      if (seenTitles.has(normTitle)) return;
+
+      if (isCatMatch(p.category, title)) {
+        seenTitles.add(normTitle);
+        const rating = typeof p.rating === 'number' ? p.rating : (parseFloat(p.rating) || 4.7);
+        const price = typeof p.price === 'number' ? p.price : (parseFloat(p.price) || 199);
+        products.push({
+          id: p.id || `prod-${Math.random().toString(36).slice(2, 7)}`,
+          title: title,
+          price: price,
+          rating: rating,
+          tag: p.tag || 'Featured',
+          img: p.image || p.img || 'assets/p-clips.jpg',
+          dataName: title,
+          dataPrice: price
+        });
+      }
+    });
+
+    // 2. Also check rendered DOM cards
+    const allCards = document.querySelectorAll('#bestsellersProductsGrid .product-item-card');
+    allCards.forEach(card => {
+      const title = card.getAttribute('data-name') || card.querySelector('.prod-name-title')?.textContent || '';
+      const normTitle = title.toLowerCase().trim();
+      if (seenTitles.has(normTitle)) return;
+
+      const cardCat = card.getAttribute('data-category') || '';
+      if (isCatMatch(cardCat, title)) {
+        seenTitles.add(normTitle);
+        const id = card.getAttribute('data-id') || `card-${Math.random().toString(36).slice(2, 7)}`;
+        const img = card.querySelector('img')?.src || 'assets/p-clips.jpg';
+        const priceEl = card.querySelector('.prod-price-text');
+        const priceMatch = (priceEl?.textContent || '').match(/\d+/);
+        const price = priceMatch ? parseInt(priceMatch[0], 10) : 199;
+        const ratingEl = card.querySelector('.prod-rating-score');
+        const ratingMatch = (ratingEl?.textContent || '').match(/\d+(\.\d+)?/);
+        const rating = ratingMatch ? parseFloat(ratingMatch[0]) : 4.8;
+        const tag = card.querySelector('.prod-badge-pill')?.textContent.trim() || 'Best Seller';
+
+        products.push({
+          id: id,
+          title: title,
+          price: price,
+          rating: rating,
+          tag: tag,
+          img: img,
+          dataName: title,
+          dataPrice: price
+        });
+      }
+    });
+
+    return products;
+  }
+
+  _getSortedFilteredProducts() {
+    let list = [...this._catPageProducts];
+
+    // Apply search filter
+    const q = (this._catPageSearch || '').toLowerCase().trim();
+    if (q) {
+      list = list.filter(p => p.title.toLowerCase().includes(q));
+    }
+
+    // Apply sort
+    switch (this._catPageSort) {
+      case 'price-low':  list.sort((a, b) => a.price - b.price); break;
+      case 'price-high': list.sort((a, b) => b.price - a.price); break;
+      case 'rating':     list.sort((a, b) => b.rating - a.rating); break;
+      case 'newest':     list.reverse(); break;
+      default: break; // featured = original order
+    }
+
+    return list;
+  }
+
+  _renderCatPageProducts() {
+    const grid     = document.getElementById('catPageProductsGrid');
+    const emptyEl  = document.getElementById('catPageEmpty');
+    const subtitle = document.getElementById('catPageSubtitle');
+    if (!grid) return;
+
+    const list = this._getSortedFilteredProducts();
+    if (subtitle) {
+      subtitle.textContent = list.length === 0
+        ? 'No products found'
+        : `${list.length} product${list.length === 1 ? '' : 's'} available`;
+    }
+
+    if (list.length === 0) {
+      grid.innerHTML = '';
+      if (emptyEl) emptyEl.style.display = 'flex';
+      return;
+    }
+
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    grid.innerHTML = list.map(p => {
+      const tag   = p.tag || 'Featured';
+      const isNew = tag.toLowerCase().includes('new');
+      const badgeClass = isNew ? 'prod-badge-pill badge-new' : 'prod-badge-pill';
+
+      return `
+        <article class="product-item-card" data-name="${escapeHtml(p.title)}" data-id="${escapeHtml(p.id)}">
+          <div class="prod-card-media">
+            <img src="${escapeHtml(p.img)}" alt="${escapeHtml(p.title)}" loading="lazy" onerror="this.onerror=null; this.src='assets/p-clips.jpg';">
+            <span class="${badgeClass}">${escapeHtml(tag)}</span>
+            <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
+          </div>
+          <div class="prod-card-info">
+            <h3 class="prod-name-title">${escapeHtml(p.title)}</h3>
+            <p class="prod-price-text">₹${p.price}</p>
+            <p class="prod-rating-score">★ ${p.rating.toFixed(1)}</p>
+            <button class="add-to-cart-action-btn cat-page-add-btn"
+              aria-label="Add to cart"
+              data-name="${escapeHtml(p.dataName)}"
+              data-price="${p.dataPrice}"
+              data-id="${escapeHtml(p.id)}">
+              <span>🛒</span> Add to Cart
+            </button>
+          </div>
+        </article>
+      `;
+    }).join('');
+
+    // Bind add-to-cart for cat page cards
+    grid.querySelectorAll('.cat-page-add-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const name  = btn.getAttribute('data-name') || 'Item';
+        const price = parseFloat(btn.getAttribute('data-price')) || 0;
+        const card  = btn.closest('.product-item-card');
+        const img   = card?.querySelector('img')?.src || null;
+        this.addToCart(name, price, img);
+      });
+    });
+
+    // Bind heart/wishlist
+    grid.querySelectorAll('.favorite-heart-btn').forEach(btn => {
+      btn.addEventListener('click', () => btn.classList.toggle('active'));
+    });
+  }
+
+  _wireCatPageEvents() {
+    // Back button
+    document.getElementById('catPageBackBtn')?.addEventListener('click', () => {
+      this.closeCategoryPage();
+    });
+
+    // Sort pills
+    document.querySelectorAll('.cat-sort-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.cat-sort-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        this._catPageSort = pill.dataset.sort || 'featured';
+        this._renderCatPageProducts();
+      });
+    });
+
+    // Search toggle
+    const searchToggle = document.getElementById('catPageSearchToggle');
+    const searchBar    = document.getElementById('catPageSearchBar');
+    const searchInput  = document.getElementById('catPageSearchInput');
+
+    searchToggle?.addEventListener('click', () => {
+      const isOpen = searchBar?.classList.toggle('open');
+      searchToggle.classList.toggle('active', isOpen);
+      if (isOpen) setTimeout(() => searchInput?.focus(), 300);
+    });
+
+    // Search input
+    searchInput?.addEventListener('input', (e) => {
+      this._catPageSearch = e.target.value;
+      this._renderCatPageProducts();
+    });
+
+    // Clear search
+    document.getElementById('catSearchClearBtn')?.addEventListener('click', () => {
+      if (searchInput) { searchInput.value = ''; searchInput.focus(); }
+      this._catPageSearch = '';
+      this._renderCatPageProducts();
+    });
+
+    // Empty state clear button
+    document.getElementById('catEmptyClearBtn')?.addEventListener('click', () => {
+      if (searchInput) searchInput.value = '';
+      this._catPageSearch = '';
+      this._renderCatPageProducts();
+    });
+
+    // Close on ESC key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const overlay = document.getElementById('categoryPageOverlay');
+        if (overlay?.classList.contains('active')) {
+          this.closeCategoryPage();
+        }
+      }
+    });
+
+    // Close on browser back button (popstate)
+    window.addEventListener('popstate', () => {
+      const overlay = document.getElementById('categoryPageOverlay');
+      if (overlay?.classList.contains('active')) {
+        this.closeCategoryPage();
+      }
+    });
+  }
+
+
+
   bindProductCardEvents() {
-    // Interactive Add to Cart buttons with Customer Auth Gatekeeper
+    // Interactive Add to Cart buttons: instantly add item and open cart modal
     document.querySelectorAll('.add-to-cart-action-btn').forEach(btn => {
       const newBtn = btn.cloneNode(true);
       btn.parentNode.replaceChild(newBtn, btn);
 
       newBtn.addEventListener('click', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         const card = newBtn.closest('.product-item-card');
         const name = newBtn.getAttribute('data-name') || (card ? card.getAttribute('data-name') : 'Item');
+        const price = parseFloat(newBtn.getAttribute('data-price')) || null;
+        const img = card ? card.querySelector('img')?.src : null;
 
-        // Gatekeeper check: User must be signed in to add items to cart!
-        const currentCustomer = window.mayzaSupabase?.getCurrentCustomer();
-        if (!currentCustomer) {
-          this.pendingCartAction = { name };
-          this.openCustomerAuthModal("Please sign in or create an account to add items to your cart! 🛍️");
-          return;
-        }
-
-        this.addToCart(name);
+        this.addToCart(name, price, img, true);
       });
     });
 
@@ -1432,13 +1937,54 @@ class MayzaEntranceApp {
       this.sound.playBubblePop(440);
     });
 
-    // Listen to custom customer auth change events
-    window.addEventListener('mayza:customer-auth-changed', () => {
-      this.updateCustomerHeaderUI();
+    // Cart Drawer Listeners
+    const storeCartBtn = document.getElementById('storeCartBtn');
+    const closeCartBtn = document.getElementById('closeStoreCartModalBtn');
+    const storeCartModal = document.getElementById('storeCartModal');
+    const checkoutForm = document.getElementById('storeCheckoutForm');
+    const cartToast = document.getElementById('cartToast');
+
+    storeCartBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.openStoreCartModal();
+    });
+
+    cartToast?.addEventListener('click', () => {
+      this.openStoreCartModal();
+    });
+
+    closeCartBtn?.addEventListener('click', () => {
+      this.closeStoreCartModal();
+    });
+
+    storeCartModal?.addEventListener('click', (e) => {
+      if (e.target === storeCartModal) {
+        this.closeStoreCartModal();
+      }
+    });
+
+    checkoutForm?.addEventListener('submit', (e) => {
+      this.handleOnlineCheckoutSubmit(e);
+    });
+
+    // Delegated click listener on product grid for Add to Cart buttons
+    const prodGrid = document.getElementById('bestsellersProductsGrid') || document.querySelector('.bestsellers-products-grid');
+    prodGrid?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.add-to-cart-action-btn');
+      if (btn) {
+        e.preventDefault();
+        e.stopPropagation();
+        const card = btn.closest('.product-item-card');
+        const name = btn.getAttribute('data-name') || (card ? card.getAttribute('data-name') : 'Item');
+        const price = parseFloat(btn.getAttribute('data-price')) || null;
+        const img = card ? card.querySelector('img')?.src : null;
+        this.addToCart(name, price, img, true);
+      }
     });
 
     // Initial check on load
     this.updateCustomerHeaderUI();
+    this.updateCartBadge();
   }
 
   openCustomerAuthModal(noticeText) {
@@ -1554,7 +2100,7 @@ class MayzaEntranceApp {
     const stages = [
       { key: 'New', label: '1. Placed' },
       { key: 'Packed', label: '2. Packed' },
-      { key: 'Shipped', label: '3. Shipped' },
+      { key: 'Dispatched', label: '3. Shipped' },
       { key: 'Delivered', label: '4. Delivered' }
     ];
 
@@ -1742,18 +2288,272 @@ class MayzaEntranceApp {
     }, { passive: true });
   }
 
-  addToCart(productName) {
-    this.cartCount++;
+  // =========================================================
+  // STOREFRONT CART & LIVE ONLINE CHECKOUT
+  // =========================================================
+  getCartItems() {
+    try {
+      return JSON.parse(localStorage.getItem('mm_storefront_cart') || '[]');
+    } catch(e) {
+      return [];
+    }
+  }
+
+  saveCartItems(items) {
+    try {
+      localStorage.setItem('mm_storefront_cart', JSON.stringify(items));
+    } catch(e) {}
+    this.updateCartBadge();
+  }
+
+  updateCartBadge() {
+    const items = this.getCartItems();
+    const count = items.reduce((sum, i) => sum + i.qty, 0);
+    this.cartCount = count;
     const badge = document.getElementById('cartCountBadge');
     if (badge) {
-      badge.textContent = this.cartCount;
+      badge.textContent = count;
       badge.classList.remove('bump');
       void badge.offsetWidth;
       badge.classList.add('bump');
       setTimeout(() => badge.classList.remove('bump'), 350);
     }
+  }
+
+  addToCart(productName, customPrice = null, customImg = null, autoOpenModal = true) {
+    let items = this.getCartItems();
+    
+    // Find product details if available in card or fallback
+    let price = customPrice;
+    let img = customImg;
+    let sku = `MM-${Date.now().toString().slice(-4)}`;
+
+    if (!price || !img) {
+      const cards = document.querySelectorAll('.product-item-card');
+      cards.forEach(card => {
+        const name = card.getAttribute('data-name');
+        if (name && name.toLowerCase().trim() === productName.toLowerCase().trim()) {
+          if (!price) {
+            const priceText = card.querySelector('.prod-price-text')?.textContent || '';
+            const match = priceText.match(/\d+/);
+            price = match ? parseInt(match[0], 10) : 199;
+          }
+          if (!img) {
+            img = card.querySelector('img')?.src || 'assets/cat-return-gifts.jpg';
+          }
+        }
+      });
+    }
+
+    price = price || 199;
+    img = img || 'assets/cat-return-gifts.jpg';
+
+    const existing = items.find(i => i.name.toLowerCase() === productName.toLowerCase());
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      items.push({
+        id: `cart-${Date.now()}-${Math.floor(Math.random()*100)}`,
+        name: productName,
+        sku: sku,
+        price: price,
+        img: img,
+        qty: 1
+      });
+    }
+
+    this.saveCartItems(items);
     this.sound.playBubblePop(880);
-    this.showToast(`Added "${productName}" to cart! 🛍️`);
+    this.showToast(`Added "${productName}" to your bag! 🛍️`);
+
+    if (autoOpenModal) {
+      this.openStoreCartModal();
+    }
+  }
+
+  openStoreCartModal() {
+    const modal = document.getElementById('storeCartModal');
+    if (!modal) return;
+
+    this.renderStoreCartItems();
+
+    // Auto prefill from signed in customer profile if available
+    const customer = window.mayzaSupabase?.getCurrentCustomer();
+    const nameInput = document.getElementById('checkoutCustName');
+    const phoneInput = document.getElementById('checkoutCustPhone');
+    const addressInput = document.getElementById('checkoutCustAddress');
+
+    if (customer) {
+      if (nameInput && !nameInput.value) nameInput.value = customer.name || '';
+      if (phoneInput && !phoneInput.value) phoneInput.value = customer.phone || '';
+      if (addressInput && !addressInput.value) addressInput.value = customer.address || '';
+    }
+
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    this.sound.playSparkleChime();
+  }
+
+  closeStoreCartModal() {
+    const modal = document.getElementById('storeCartModal');
+    if (modal) {
+      modal.classList.remove('active');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  renderStoreCartItems() {
+    const container = document.getElementById('storeCartItemsList');
+    const subtotalEl = document.getElementById('storeCartSubtotal');
+    const shippingEl = document.getElementById('storeCartShipping');
+    const grandTotalEl = document.getElementById('storeCartGrandTotal');
+    if (!container) return;
+
+    const items = this.getCartItems();
+    const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    const shipping = subtotal > 499 || subtotal === 0 ? 0 : 49;
+    const grandTotal = subtotal + shipping;
+
+    if (subtotalEl) subtotalEl.textContent = `₹${subtotal}`;
+    if (shippingEl) shippingEl.textContent = shipping === 0 ? 'FREE' : `₹${shipping}`;
+    if (grandTotalEl) grandTotalEl.textContent = `₹${grandTotal}`;
+
+    if (items.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; padding: 24px 10px; color: #8F5E6B;">
+          <div style="font-size: 2rem; margin-bottom: 6px;">🛍️</div>
+          <strong style="font-size: 0.95rem; color: #38121C; display: block; margin-bottom: 4px;">Your bag is empty</strong>
+          <span style="font-size: 0.8rem;">Explore our cute bestsellers &amp; accessories to fill your bag!</span>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = items.map(item => `
+      <div style="display: flex; align-items: center; justify-content: space-between; background: #FFFDFD; border: 1.5px solid #FFD1DA; border-radius: 12px; padding: 8px 12px; gap: 10px;">
+        <img src="${item.img}" alt="${item.name}" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #eee;">
+        <div style="flex: 1; display: flex; flex-direction: column;">
+          <strong style="font-size: 0.82rem; color: #38121C; line-height: 1.2;">${item.name}</strong>
+          <span style="font-size: 0.74rem; color: #D9657B; font-weight: 700;">₹${item.price} each</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <button type="button" class="pos-qty-btn" style="width:22px; height:22px; border-radius:6px; border:1px solid #FFD1DA; background:#fff; cursor:pointer;" onclick="window.mayzaApp?.updateCartItemQty('${item.id}', -1)">-</button>
+          <span style="font-weight: 800; font-size: 0.82rem; min-width: 16px; text-align: center;">${item.qty}</span>
+          <button type="button" class="pos-qty-btn" style="width:22px; height:22px; border-radius:6px; border:1px solid #FFD1DA; background:#fff; cursor:pointer;" onclick="window.mayzaApp?.updateCartItemQty('${item.id}', 1)">+</button>
+        </div>
+        <span style="font-weight: 800; font-size: 0.88rem; color: #38121C; min-width: 45px; text-align: right;">
+          ₹${item.price * item.qty}
+        </span>
+        <button type="button" style="background: none; border: none; color: #ff4757; font-size: 1rem; cursor: pointer; padding: 0 4px;" onclick="window.mayzaApp?.removeCartItem('${item.id}')" title="Remove item">×</button>
+      </div>
+    `).join('');
+  }
+
+  updateCartItemQty(itemId, delta) {
+    let items = this.getCartItems();
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    item.qty += delta;
+    if (item.qty <= 0) {
+      items = items.filter(i => i.id !== itemId);
+    }
+
+    this.saveCartItems(items);
+    this.renderStoreCartItems();
+    this.sound.playBubblePop(600);
+  }
+
+  removeCartItem(itemId) {
+    let items = this.getCartItems();
+    items = items.filter(i => i.id !== itemId);
+    this.saveCartItems(items);
+    this.renderStoreCartItems();
+    this.sound.playClick();
+  }
+
+  async handleOnlineCheckoutSubmit(e) {
+    e.preventDefault();
+
+    const items = this.getCartItems();
+    if (items.length === 0) {
+      this.showToast('Your bag is empty! Please add items before placing order.', 'warning');
+      return;
+    }
+
+    const name = document.getElementById('checkoutCustName')?.value.trim();
+    const phone = document.getElementById('checkoutCustPhone')?.value.trim();
+    const address = document.getElementById('checkoutCustAddress')?.value.trim();
+    const payment = document.getElementById('checkoutPaymentMode')?.value || 'Cash on Delivery (COD)';
+    const feedback = document.getElementById('checkoutFeedbackMsg');
+
+    if (!name || !phone || !address) {
+      if (feedback) feedback.textContent = 'Please fill in all shipping details.';
+      return;
+    }
+
+    const subtotal = items.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    const shipping = subtotal > 499 ? 0 : 49;
+    const grandTotal = subtotal + shipping;
+    const orderId = `MM-ONL-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const newOrder = {
+      id: orderId,
+      channel: 'online',
+      source: 'Online Storefront',
+      customer: {
+        name: name,
+        phone: phone,
+        address: address,
+        city: address.split(',').pop().trim() || 'India'
+      },
+      items: items.map(i => ({
+        name: i.name,
+        sku: i.sku || 'MM-ONL',
+        qty: i.qty,
+        price: i.price
+      })),
+      subtotal: subtotal,
+      shipping: shipping,
+      total: grandTotal,
+      payment: payment,
+      status: 'New',
+      timestamp: 'Just now',
+      rawDate: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+    };
+
+    // 1. Save to local storage for instant sync across tabs
+    try {
+      let orders = JSON.parse(localStorage.getItem('mm_orders') || '[]');
+      if (!Array.isArray(orders)) orders = [];
+      orders.unshift(newOrder);
+      localStorage.setItem('mm_orders', JSON.stringify(orders));
+      localStorage.setItem('mm_orders_timestamp', Date.now().toString());
+    } catch(err) {}
+
+    // 2. Broadcast event
+    window.dispatchEvent(new CustomEvent('mayza:orders-updated', {
+      detail: { orders: [newOrder] }
+    }));
+
+    // 3. Save to Supabase Cloud if configured
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      window.mayzaSupabase.createOrder(newOrder).catch(console.warn);
+    }
+
+    // 4. Clear customer bag
+    this.saveCartItems([]);
+    this.closeStoreCartModal();
+
+    // 5. Success Celebration!
+    this.celebrateConfetti();
+    this.sound.playSparkleChime();
+    this.showToast(`🎉 Order ${orderId} placed successfully! Thank you ${name}! 💕`);
+
+    // 6. Refresh Customer Dashboard orders if customer is signed in
+    if (window.mayzaSupabase?.getCurrentCustomer()) {
+      this.renderCustomerOrders();
+    }
   }
 
   showToast(message) {
