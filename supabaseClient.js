@@ -955,14 +955,22 @@
       // 1. Check Supabase Cloud database first (works across all sites & devices)
       if (this.isConfigured()) {
         try {
+          console.log('[Auth] Querying Supabase customers table for:', cleanEmail);
           const { data, error } = await this.client
             .from('customers')
             .select('*')
             .eq('email', cleanEmail)
             .limit(1);
 
-          if (!error && data && data.length > 0) {
+          if (error) {
+            // If table doesn't exist, error.code will be '42P01'
+            console.error('[Auth] Supabase customers query error:', error.code, error.message, error.details);
+            if (error.code === '42P01') {
+              console.error('[Auth] ❌ The "customers" table does not exist in Supabase! Please run supabase_schema.sql in the Supabase SQL Editor.');
+            }
+          } else if (data && data.length > 0) {
             const user = data[0];
+            console.log('[Auth] ✅ Found user in Supabase cloud:', user.email);
             if (user.password === password) {
               const safeCustomer = {
                 id: user.id,
@@ -976,20 +984,27 @@
               // Cache user locally for offline access
               try {
                 const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
-                if (!localCusts.some(c => (c.email || '').toLowerCase() === cleanEmail)) {
+                const idx = localCusts.findIndex(c => (c.email || '').toLowerCase() === cleanEmail);
+                if (idx !== -1) {
+                  localCusts[idx] = user;
+                } else {
                   localCusts.push(user);
-                  localStorage.setItem('mm_local_customers', JSON.stringify(localCusts));
                 }
+                localStorage.setItem('mm_local_customers', JSON.stringify(localCusts));
               } catch (e) {}
 
               return { success: true, customer: safeCustomer };
             } else {
               return { success: false, message: 'Incorrect password. Please try again.' };
             }
+          } else {
+            console.log('[Auth] No user found in Supabase cloud with email:', cleanEmail);
           }
         } catch (err) {
-          console.warn('[Supabase] Login check cloud error:', err);
+          console.error('[Auth] Login cloud exception:', err.message, err);
         }
+      } else {
+        console.warn('[Auth] Supabase not configured — skipping cloud lookup');
       }
 
       // 2. Check local storage fallback (and auto-push to cloud if found)
