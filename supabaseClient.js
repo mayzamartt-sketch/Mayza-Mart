@@ -699,6 +699,10 @@
       try {
         const deletedProductIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
 
+        // Fetch current cloud data
+        const cloudData = await this.syncSupabaseToLocal();
+        if (!cloudData) return null;
+
         // Filter out any deleted products from cloud results
         if (Array.isArray(cloudData.products)) {
           cloudData.products = cloudData.products.filter(p => !deletedProductIds.has(String(p.id)));
@@ -851,6 +855,31 @@
       this.setCurrentCustomer(null);
     }
 
+    // Auto-sync any local accounts to Supabase Cloud
+    async syncCustomersToCloud() {
+      if (!this.isConfigured()) return;
+      try {
+        const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
+        if (Array.isArray(localCusts) && localCusts.length > 0) {
+          for (const c of localCusts) {
+            if (c.email && c.password) {
+              await this.client.from('customers').upsert([{
+                id: c.id || ('CUST-' + Math.floor(100000 + Math.random() * 900000)),
+                name: c.name || 'Valued Customer',
+                email: c.email.trim().toLowerCase(),
+                phone: c.phone || '',
+                address: c.address || '',
+                password: c.password,
+                created_at: c.created_at || new Date().toISOString()
+              }], { onConflict: 'email' });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[Supabase] syncCustomersToCloud error:', err);
+      }
+    }
+
     async registerCustomer({ name, email, phone, address, password }) {
       const cleanEmail = (email || '').trim().toLowerCase();
       const cleanName = (name || '').trim();
@@ -871,7 +900,7 @@
         created_at: new Date().toISOString()
       };
 
-      // Try Supabase first if online
+      // 1. Save directly to Supabase Cloud PostgreSQL
       if (this.isConfigured()) {
         try {
           const { data: existing, error: checkErr } = await this.client
@@ -884,22 +913,24 @@
             return { success: false, message: 'An account with this email already exists. Please sign in!' };
           }
 
-          const { data, error } = await this.client.from('customers').insert([newCustomer]).select();
-          if (error) {
-            console.warn('[Supabase] Customers table insert error, fallback local:', error.message);
+          const { error: insErr } = await this.client.from('customers').upsert([newCustomer], { onConflict: 'email' });
+          if (insErr) {
+            console.warn('[Supabase] Customer insert cloud error:', insErr.message);
           }
         } catch (err) {
-          console.warn('[Supabase] Customer register fallback:', err);
+          console.warn('[Supabase] Customer register cloud error:', err);
         }
       }
 
-      // Save locally as well for offline resilience
+      // 2. Save locally for instant offline session
       try {
         const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
-        if (localCusts.some(c => (c.email || '').toLowerCase() === cleanEmail)) {
-          return { success: false, message: 'An account with this email already exists. Please sign in!' };
+        const idx = localCusts.findIndex(c => (c.email || '').toLowerCase() === cleanEmail);
+        if (idx !== -1) {
+          localCusts[idx] = newCustomer;
+        } else {
+          localCusts.push(newCustomer);
         }
-        localCusts.push(newCustomer);
         localStorage.setItem('mm_local_customers', JSON.stringify(localCusts));
       } catch (e) {}
 
@@ -921,7 +952,7 @@
         return { success: false, message: 'Please enter both email and password.' };
       }
 
-      // Check cloud database
+      // 1. Check Supabase Cloud database first (works across all sites & devices)
       if (this.isConfigured()) {
         try {
           const { data, error } = await this.client
@@ -941,6 +972,16 @@
                 address: user.address
               };
               this.setCurrentCustomer(safeCustomer);
+
+              // Cache user locally for offline access
+              try {
+                const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
+                if (!localCusts.some(c => (c.email || '').toLowerCase() === cleanEmail)) {
+                  localCusts.push(user);
+                  localStorage.setItem('mm_local_customers', JSON.stringify(localCusts));
+                }
+              } catch (e) {}
+
               return { success: true, customer: safeCustomer };
             } else {
               return { success: false, message: 'Incorrect password. Please try again.' };
@@ -951,7 +992,7 @@
         }
       }
 
-      // Check local storage fallback
+      // 2. Check local storage fallback (and auto-push to cloud if found)
       try {
         const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
         const found = localCusts.find(c => (c.email || '').toLowerCase() === cleanEmail);
@@ -965,6 +1006,12 @@
               address: found.address
             };
             this.setCurrentCustomer(safeCustomer);
+
+            // Auto-push to Supabase so it's permanently synced across all devices
+            if (this.isConfigured()) {
+              this.client.from('customers').upsert([found], { onConflict: 'email' }).catch(console.warn);
+            }
+
             return { success: true, customer: safeCustomer };
           } else {
             return { success: false, message: 'Incorrect password. Please try again.' };
@@ -972,7 +1019,7 @@
         }
       } catch (e) {}
 
-      return { success: false, message: 'No account found with this email. Please create an account first!' };
+      return { success: false, message: 'No registered account found with this email. Please create an account first!' };
     }
 
     async checkCustomerEmailExists(email) {
