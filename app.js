@@ -758,9 +758,11 @@ class MayzaEntranceApp {
     this.syncLiveBannersAndCoupons();
     this.syncLiveCategories();
     this.syncLiveProducts();
+    this.syncCloudCart();
   }
 
   initStorefrontInteractions() {
+    this.syncCloudCart();
     this.bindProductCardEvents();
 
     // Live Search Filter for Bestsellers
@@ -857,6 +859,8 @@ class MayzaEntranceApp {
       this.bindProductCardEvents();
     };
 
+    const deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+
     // 1. Initial cached values
     let cachedList = null;
     try {
@@ -865,20 +869,22 @@ class MayzaEntranceApp {
     } catch (e) {}
 
     if (Array.isArray(cachedList) && cachedList.length > 0) {
-      const customTitles = new Set(cachedList.map(c => (c.title || '').toLowerCase().trim()));
-      const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()));
-      renderProducts([...cachedList, ...remainingDefaults]);
+      const cleanList = cachedList.filter(p => !deletedIds.has(String(p.id)));
+      const customTitles = new Set(cleanList.map(c => (c.title || '').toLowerCase().trim()));
+      const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()) && !deletedIds.has(String(d.id)));
+      renderProducts([...cleanList, ...remainingDefaults]);
     }
 
     // 2. Fetch live from Supabase
     if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
       try {
         const cloudProducts = await window.mayzaSupabase.fetchProducts();
-        if (Array.isArray(cloudProducts) && cloudProducts.length > 0) {
-          localStorage.setItem('mm_products', JSON.stringify(cloudProducts));
-          const customTitles = new Set(cloudProducts.map(c => (c.title || '').toLowerCase().trim()));
-          const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()));
-          renderProducts([...cloudProducts, ...remainingDefaults]);
+        if (Array.isArray(cloudProducts)) {
+          const cleanCloud = cloudProducts.filter(p => !deletedIds.has(String(p.id)));
+          localStorage.setItem('mm_products', JSON.stringify(cleanCloud));
+          const customTitles = new Set(cleanCloud.map(c => (c.title || '').toLowerCase().trim()));
+          const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()) && !deletedIds.has(String(d.id)));
+          renderProducts([...cleanCloud, ...remainingDefaults]);
         }
       } catch (err) {
         console.warn('[Storefront] syncLiveProducts error:', err);
@@ -890,9 +896,10 @@ class MayzaEntranceApp {
       this.hasProductListeners = true;
       window.addEventListener('mayza:products-updated', (e) => {
         if (e.detail?.products && Array.isArray(e.detail.products)) {
-          const customTitles = new Set(e.detail.products.map(c => (c.title || '').toLowerCase().trim()));
-          const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()));
-          renderProducts([...e.detail.products, ...remainingDefaults]);
+          const cleanList = e.detail.products.filter(p => !deletedIds.has(String(p.id)));
+          const customTitles = new Set(cleanList.map(c => (c.title || '').toLowerCase().trim()));
+          const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()) && !deletedIds.has(String(d.id)));
+          renderProducts([...cleanList, ...remainingDefaults]);
         } else {
           this.syncLiveProducts();
         }
@@ -902,6 +909,9 @@ class MayzaEntranceApp {
         if (e.key === 'mm_products' || e.key === 'mm_products_timestamp') {
           this.syncLiveProducts();
         }
+        if (e.key === 'mm_storefront_cart') {
+          this.updateCartBadge();
+        }
       });
 
       window.addEventListener('mayza:cloud-products-changed', (e) => {
@@ -909,9 +919,24 @@ class MayzaEntranceApp {
         this.syncLiveProducts();
       });
 
+      window.addEventListener('mayza:cloud-cart-changed', (e) => {
+        console.log('[Storefront Realtime] Cloud cart updated');
+        if (e.detail?.items && Array.isArray(e.detail.items)) {
+          localStorage.setItem('mm_storefront_cart', JSON.stringify(e.detail.items));
+          this.updateCartBadge();
+          const modal = document.getElementById('storeCartModal');
+          if (modal && modal.classList.contains('active')) {
+            this.renderStoreCartItems();
+          }
+        } else {
+          this.syncCloudCart();
+        }
+      });
+
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') {
           this.syncLiveProducts();
+          this.syncCloudCart();
         }
       });
 
@@ -919,6 +944,7 @@ class MayzaEntranceApp {
       setInterval(() => {
         if (document.visibilityState === 'visible' && window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
           this.syncLiveProducts();
+          this.syncCloudCart();
         }
       }, 15000);
     }
@@ -2322,6 +2348,28 @@ class MayzaEntranceApp {
       localStorage.setItem('mm_storefront_cart', JSON.stringify(items));
     } catch(e) {}
     this.updateCartBadge();
+
+    // Sync cart to Supabase Cloud so it shows on live site & other devices
+    if (window.mayzaSupabase && typeof window.mayzaSupabase.saveCloudCart === 'function') {
+      window.mayzaSupabase.saveCloudCart(items).catch(console.warn);
+    }
+  }
+
+  async syncCloudCart() {
+    if (!window.mayzaSupabase || typeof window.mayzaSupabase.getCloudCart !== 'function') return;
+    try {
+      const cloudItems = await window.mayzaSupabase.getCloudCart();
+      if (Array.isArray(cloudItems)) {
+        localStorage.setItem('mm_storefront_cart', JSON.stringify(cloudItems));
+        this.updateCartBadge();
+        const modal = document.getElementById('storeCartModal');
+        if (modal && modal.classList.contains('active')) {
+          this.renderStoreCartItems();
+        }
+      }
+    } catch (err) {
+      console.warn('[Storefront] syncCloudCart error:', err);
+    }
   }
 
   updateCartBadge() {

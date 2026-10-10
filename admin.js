@@ -181,8 +181,9 @@ class StudioState {
       const data = await window.mayzaSupabase.autoSyncBidirectional(this);
       if (data) {
         let changed = false;
-        if (Array.isArray(data.products) && data.products.length > 0) {
-          this.products = data.products;
+        if (Array.isArray(data.products)) {
+          const deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+          this.products = data.products.filter(p => !deletedIds.has(String(p.id)));
           changed = true;
         }
         if (Array.isArray(data.orders)) {
@@ -942,22 +943,27 @@ function adjustStock(productId, delta) {
   }
 }
 
-function deleteProduct(productId) {
-  const prod = state.products.find(p => p.id === productId);
+async function deleteProduct(productId) {
+  const prod = state.products.find(p => String(p.id) === String(productId));
   if (!prod) return;
 
   if (confirm(`Are you sure you want to remove "${prod.title}" from Wonderland Studio?`)) {
-    state.products = state.products.filter(p => p.id !== productId);
+    // 1. Immediately remove from local state & UI
+    state.products = state.products.filter(p => String(p.id) !== String(productId));
     state.save();
-
-    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
-      window.mayzaSupabase.deleteProduct(productId).catch(console.warn);
-    }
-
-    showToast(`Removed "${prod.title}" from inventory.`);
-    audio.playClick();
     renderProductMatrix();
     renderDashboardOverview();
+    showToast(`Removed "${prod.title}" from inventory.`);
+    audio?.playClick();
+
+    // 2. Delete permanently from Supabase
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      try {
+        await window.mayzaSupabase.deleteProduct(productId);
+      } catch (err) {
+        console.warn('Supabase deleteProduct error:', err);
+      }
+    }
   }
 }
 
@@ -3434,9 +3440,13 @@ function initSupabaseManager() {
   // Realtime listeners: automatically sync when changes happen on live site
   window.addEventListener("mayza:cloud-products-changed", async (e) => {
     console.log("[Admin Realtime] Products updated in cloud:", e.detail?.eventType);
+    const deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+    if (e.detail?.old?.id) {
+      deletedIds.add(String(e.detail.old.id));
+    }
     const products = await window.mayzaSupabase.fetchProducts();
-    if (Array.isArray(products) && products.length > 0) {
-      state.products = products;
+    if (Array.isArray(products)) {
+      state.products = products.filter(p => !deletedIds.has(String(p.id)));
       state.save();
       renderProductMatrix();
       renderDashboardOverview();

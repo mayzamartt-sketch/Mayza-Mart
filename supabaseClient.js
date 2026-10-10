@@ -66,7 +66,12 @@
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'coupons' }, (payload) => {
             console.log('[Supabase Realtime] Coupons event:', payload.eventType);
-            window.dispatchEvent(new CustomEvent('mayza:cloud-coupons-changed', { detail: payload }));
+            const code = String(payload.new?.code || payload.old?.code || '');
+            if (code.startsWith('CART_')) {
+              window.dispatchEvent(new CustomEvent('mayza:cloud-cart-changed', { detail: payload }));
+            } else {
+              window.dispatchEvent(new CustomEvent('mayza:cloud-coupons-changed', { detail: payload }));
+            }
           })
           .on('postgres_changes', { event: '*', schema: 'public', table: 'wholesale_purchases' }, (payload) => {
             console.log('[Supabase Realtime] Wholesale event:', payload.eventType);
@@ -180,10 +185,38 @@
     }
 
     async deleteProduct(id) {
-      if (!this.isConfigured()) return false;
+      if (!id) return false;
+
+      // 1. Mark as permanently deleted in localStorage so auto-sync never resurrects it
+      try {
+        const deletedIds = JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]');
+        if (!deletedIds.includes(String(id))) {
+          deletedIds.push(String(id));
+          localStorage.setItem('mm_deleted_product_ids', JSON.stringify(deletedIds));
+        }
+      } catch (e) {}
+
+      // 2. Remove immediately from local cached products list
+      try {
+        const localProds = JSON.parse(localStorage.getItem('mm_products') || '[]');
+        const filtered = localProds.filter(p => String(p.id) !== String(id));
+        localStorage.setItem('mm_products', JSON.stringify(filtered));
+      } catch (e) {}
+
+      if (!this.isConfigured()) return true;
+
       try {
         const { error } = await this.client.from('products').delete().eq('id', id);
         if (error) throw error;
+
+        // Broadcast to all tabs & storefront
+        window.dispatchEvent(new CustomEvent('mayza:cloud-products-changed', {
+          detail: { eventType: 'DELETE', old: { id: id } }
+        }));
+        window.dispatchEvent(new CustomEvent('mayza:products-updated', {
+          detail: { deletedId: id }
+        }));
+
         return true;
       } catch (err) {
         console.error('[Supabase] deleteProduct error:', err);
@@ -664,15 +697,19 @@
     async autoSyncBidirectional(localState) {
       if (!this.isConfigured()) return null;
       try {
-        const cloudData = await this.syncSupabaseToLocal();
-        if (!cloudData) return null;
+        const deletedProductIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+
+        // Filter out any deleted products from cloud results
+        if (Array.isArray(cloudData.products)) {
+          cloudData.products = cloudData.products.filter(p => !deletedProductIds.has(String(p.id)));
+        }
 
         const cloudProductIds = new Set((cloudData.products || []).map(p => String(p.id)));
         const cloudOrderIds = new Set((cloudData.orders || []).map(o => String(o.id)));
         const cloudWholesaleIds = new Set((cloudData.wholesalePurchases || []).map(w => String(w.id)));
 
-        // Find any local items not yet stored in Supabase
-        const pendingProducts = (localState.products || []).filter(p => p && p.id && !cloudProductIds.has(String(p.id)));
+        // Find any local items not yet stored in Supabase (excluding deleted items!)
+        const pendingProducts = (localState.products || []).filter(p => p && p.id && !cloudProductIds.has(String(p.id)) && !deletedProductIds.has(String(p.id)));
         const pendingOrders = (localState.orders || []).filter(o => o && o.id && !cloudOrderIds.has(String(o.id)));
         const pendingWholesale = (localState.wholesalePurchases || []).filter(w => w && w.id && !cloudWholesaleIds.has(String(w.id)));
 
@@ -700,7 +737,11 @@
 
         // If local items were uploaded, pull the combined fresh state
         if (pushedAny) {
-          return await this.syncSupabaseToLocal();
+          const fresh = await this.syncSupabaseToLocal();
+          if (fresh && Array.isArray(fresh.products)) {
+            fresh.products = fresh.products.filter(p => !deletedProductIds.has(String(p.id)));
+          }
+          return fresh;
         }
 
         return cloudData;
@@ -708,6 +749,79 @@
         console.warn('[Supabase AutoSync error]:', err);
         return null;
       }
+    }
+
+    // =========================================================
+    // STOREFRONT CART REAL-TIME CLOUD SYNC
+    // =========================================================
+    getCartStorageKey() {
+      const cust = this.getCurrentCustomer();
+      if (cust && cust.id) {
+        return `CART_CUST_${cust.id}`;
+      }
+      return 'CART_SHARED_LIVE';
+    }
+
+    async getCloudCart() {
+      let localItems = [];
+      try {
+        const stored = localStorage.getItem('mm_storefront_cart');
+        if (stored) localItems = JSON.parse(stored);
+      } catch (e) {}
+
+      if (!this.isConfigured()) return localItems;
+
+      const key = this.getCartStorageKey();
+      try {
+        const { data, error } = await this.client
+          .from('coupons')
+          .select('desc')
+          .eq('code', key)
+          .limit(1);
+
+        if (!error && data && data.length > 0 && data[0].desc) {
+          const cloudItems = JSON.parse(data[0].desc);
+          if (Array.isArray(cloudItems)) {
+            localStorage.setItem('mm_storefront_cart', JSON.stringify(cloudItems));
+            return cloudItems;
+          }
+        }
+      } catch (err) {
+        console.warn('[Supabase] getCloudCart error:', err);
+      }
+
+      return localItems;
+    }
+
+    async saveCloudCart(items) {
+      const cleanItems = Array.isArray(items) ? items : [];
+      try {
+        localStorage.setItem('mm_storefront_cart', JSON.stringify(cleanItems));
+      } catch (e) {}
+
+      if (!this.isConfigured()) return true;
+
+      const key = this.getCartStorageKey();
+      try {
+        const row = {
+          code: key,
+          discount: 0,
+          min_spend: 0,
+          desc: JSON.stringify(cleanItems),
+          active: true,
+          uses: cleanItems.length
+        };
+        await this.client.from('coupons').upsert(row);
+
+        // Broadcast to other tabs & listeners
+        window.dispatchEvent(new CustomEvent('mayza:cloud-cart-changed', {
+          detail: { items: cleanItems }
+        }));
+      } catch (err) {
+        console.warn('[Supabase] saveCloudCart error:', err);
+      }
+
+      return true;
     }
 
     // =========================================================
