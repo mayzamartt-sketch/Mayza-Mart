@@ -182,7 +182,12 @@ class StudioState {
       if (data) {
         let changed = false;
         if (Array.isArray(data.products)) {
-          const deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+          let deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+          if (window.mayzaSupabase && window.mayzaSupabase.fetchDeletedProductIds) {
+            try {
+              deletedIds = await window.mayzaSupabase.fetchDeletedProductIds();
+            } catch(e) {}
+          }
           this.products = data.products.filter(p => !deletedIds.has(String(p.id)));
           changed = true;
         }
@@ -3440,7 +3445,12 @@ function initSupabaseManager() {
   // Realtime listeners: automatically sync when changes happen on live site
   window.addEventListener("mayza:cloud-products-changed", async (e) => {
     console.log("[Admin Realtime] Products updated in cloud:", e.detail?.eventType);
-    const deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+    let deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+    if (window.mayzaSupabase && window.mayzaSupabase.fetchDeletedProductIds) {
+      try {
+        deletedIds = await window.mayzaSupabase.fetchDeletedProductIds();
+      } catch (err) {}
+    }
     if (e.detail?.old?.id) {
       deletedIds.add(String(e.detail.old.id));
     }

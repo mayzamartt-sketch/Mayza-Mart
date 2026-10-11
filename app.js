@@ -859,9 +859,15 @@ class MayzaEntranceApp {
       this.bindProductCardEvents();
     };
 
-    const deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+    // 1. First fetch cloud-deleted IDs so ALL clients (live, localhost, incognito) respect admin deletions
+    let deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]').map(String));
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      try {
+        deletedIds = await window.mayzaSupabase.fetchDeletedProductIds();
+      } catch (e) {}
+    }
 
-    // 1. Initial cached values
+    // 2. Show cached local products while cloud loads (filtered by deletedIds)
     let cachedList = null;
     try {
       const stored = localStorage.getItem('mm_products');
@@ -875,7 +881,7 @@ class MayzaEntranceApp {
       renderProducts([...cleanList, ...remainingDefaults]);
     }
 
-    // 2. Fetch live from Supabase
+    // 3. Fetch live products from Supabase (authoritative source)
     if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
       try {
         const cloudProducts = await window.mayzaSupabase.fetchProducts();
@@ -883,7 +889,10 @@ class MayzaEntranceApp {
           const cleanCloud = cloudProducts.filter(p => !deletedIds.has(String(p.id)));
           localStorage.setItem('mm_products', JSON.stringify(cleanCloud));
           const customTitles = new Set(cleanCloud.map(c => (c.title || '').toLowerCase().trim()));
-          const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()) && !deletedIds.has(String(d.id)));
+          // Only show default products whose title was NEVER in cloud AND not deleted
+          const remainingDefaults = defaultCatalog.filter(d =>
+            !customTitles.has(d.title.toLowerCase().trim()) && !deletedIds.has(String(d.id))
+          );
           renderProducts([...cleanCloud, ...remainingDefaults]);
         }
       } catch (err) {
@@ -1202,6 +1211,12 @@ class MayzaEntranceApp {
       if (stored) storedProducts = JSON.parse(stored);
     } catch (e) {}
 
+    // Deleted products filter (respect cloud & local deletions)
+    let deletedIds = new Set();
+    try {
+      deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]').map(String));
+    } catch (e) {}
+
     // Source B: default catalog
     const defaultCatalog = [
       { id: 'def-1', title: 'Cute Hair Clips Set (Pack of 12)', category: 'Hair Accessories', price: 249, rating: 4.8, tag: 'Best Seller', image: 'assets/p-clips.jpg' },
@@ -1214,9 +1229,12 @@ class MayzaEntranceApp {
       { id: 'def-8', title: 'Teddy Bear (Small)', category: 'Toys', price: 399, rating: 4.9, tag: 'Best Seller', image: 'assets/cat-toys.jpg' }
     ];
 
-    const allCatalog = Array.isArray(storedProducts) && storedProducts.length > 0
-      ? [...storedProducts, ...defaultCatalog]
-      : defaultCatalog;
+    const cleanStored = (storedProducts || []).filter(p => !deletedIds.has(String(p.id)));
+    const cleanDefault = defaultCatalog.filter(d => !deletedIds.has(String(d.id)));
+
+    const allCatalog = cleanStored.length > 0
+      ? [...cleanStored, ...cleanDefault]
+      : cleanDefault;
 
     // Helper: fuzzy matching
     const isCatMatch = (prodCat, prodTitle) => {

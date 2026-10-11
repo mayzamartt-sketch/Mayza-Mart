@@ -209,6 +209,30 @@
         const { error } = await this.client.from('products').delete().eq('id', id);
         if (error) throw error;
 
+        // 3. Persist deleted ID to Supabase so ALL clients (live site, other browsers) know
+        try {
+          const { data: existing } = await this.client
+            .from('coupons')
+            .select('desc')
+            .eq('code', 'DELETED_PRODUCTS')
+            .limit(1);
+          const cloudDeletedIds = JSON.parse((existing && existing[0]?.desc) || '[]');
+          if (!cloudDeletedIds.includes(String(id))) {
+            cloudDeletedIds.push(String(id));
+          }
+          await this.client.from('coupons').upsert({
+            code: 'DELETED_PRODUCTS',
+            discount: 0,
+            min_spend: 0,
+            desc: JSON.stringify(cloudDeletedIds),
+            active: true,
+            uses: cloudDeletedIds.length
+          });
+          console.log('[Supabase] Persisted deleted product ID to cloud:', id);
+        } catch (cloudErr) {
+          console.warn('[Supabase] Could not persist deleted ID to cloud:', cloudErr);
+        }
+
         // Broadcast to all tabs & storefront
         window.dispatchEvent(new CustomEvent('mayza:cloud-products-changed', {
           detail: { eventType: 'DELETE', old: { id: id } }
@@ -222,6 +246,39 @@
         console.error('[Supabase] deleteProduct error:', err);
         throw err;
       }
+    }
+
+    // Fetch cloud-persisted deleted product IDs (so all clients respect deletions)
+    async fetchDeletedProductIds() {
+      // Always start with local list
+      let localIds = [];
+      try {
+        localIds = JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]');
+      } catch (e) {}
+
+      if (!this.isConfigured()) return new Set(localIds.map(String));
+
+      try {
+        const { data, error } = await this.client
+          .from('coupons')
+          .select('desc')
+          .eq('code', 'DELETED_PRODUCTS')
+          .limit(1);
+
+        if (!error && data && data[0]?.desc) {
+          const cloudIds = JSON.parse(data[0].desc);
+          if (Array.isArray(cloudIds)) {
+            // Merge cloud + local deleted IDs and update localStorage
+            const merged = [...new Set([...localIds, ...cloudIds].map(String))];
+            localStorage.setItem('mm_deleted_product_ids', JSON.stringify(merged));
+            return new Set(merged);
+          }
+        }
+      } catch (err) {
+        console.warn('[Supabase] fetchDeletedProductIds error:', err);
+      }
+
+      return new Set(localIds.map(String));
     }
 
     // =========================================================
@@ -404,7 +461,7 @@
         const { data, error } = await this.client.from('coupons').select('*');
         if (error) throw error;
         return data
-          .filter(c => c.code !== 'STORE_BANNER')
+          .filter(c => c.code !== 'STORE_BANNER' && c.code !== 'DELETED_PRODUCTS' && !String(c.code).startsWith('CART_'))
           .map(c => ({
             code: c.code,
             discount: Number(c.discount),
@@ -697,7 +754,10 @@
     async autoSyncBidirectional(localState) {
       if (!this.isConfigured()) return null;
       try {
-        const deletedProductIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+        let deletedProductIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+        try {
+          deletedProductIds = await this.fetchDeletedProductIds();
+        } catch (e) {}
 
         // Fetch current cloud data
         const cloudData = await this.syncSupabaseToLocal();
