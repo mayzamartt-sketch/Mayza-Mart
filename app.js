@@ -921,11 +921,29 @@ class MayzaEntranceApp {
         if (e.key === 'mm_storefront_cart') {
           this.updateCartBadge();
         }
+        if (e.key === 'mm_orders' || e.key === 'mm_orders_timestamp' || e.key === 'mm_deleted_order_ids') {
+          if (window.mayzaSupabase?.getCurrentCustomer()) {
+            this.renderCustomerOrders();
+          }
+        }
       });
 
       window.addEventListener('mayza:cloud-products-changed', (e) => {
         console.log('[Storefront Realtime] Cloud products updated:', e.detail?.eventType);
         this.syncLiveProducts();
+      });
+
+      window.addEventListener('mayza:cloud-orders-changed', () => {
+        console.log('[Storefront Realtime] Cloud orders updated');
+        if (window.mayzaSupabase?.getCurrentCustomer()) {
+          this.renderCustomerOrders();
+        }
+      });
+
+      window.addEventListener('mayza:orders-updated', () => {
+        if (window.mayzaSupabase?.getCurrentCustomer()) {
+          this.renderCustomerOrders();
+        }
       });
 
       window.addEventListener('mayza:cloud-cart-changed', (e) => {
@@ -2145,7 +2163,15 @@ class MayzaEntranceApp {
 
     container.innerHTML = '<div style="text-align:center; padding: 2rem; color:#8F5E6B;">Loading your orders... ⏳</div>';
 
-    const orders = await window.mayzaSupabase?.getCustomerOrders(customer.email, customer.phone) || [];
+    let deletedOrderIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_order_ids') || '[]'));
+    if (window.mayzaSupabase && window.mayzaSupabase.fetchDeletedOrderIds) {
+      try {
+        deletedOrderIds = await window.mayzaSupabase.fetchDeletedOrderIds();
+      } catch (e) {}
+    }
+
+    const rawOrders = await window.mayzaSupabase?.getCustomerOrders(customer.email, customer.phone) || [];
+    const orders = (rawOrders || []).filter(o => !deletedOrderIds.has(String(o.id)));
     if (countBadge) countBadge.textContent = orders.length;
 
     if (!orders || orders.length === 0) {
