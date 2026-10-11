@@ -282,28 +282,66 @@
     }
 
     // =========================================================
+    // =========================================================
     // ORDERS CRUD
     // =========================================================
+    async fetchDeletedOrderIds() {
+      let localIds = [];
+      try {
+        localIds = JSON.parse(localStorage.getItem('mm_deleted_order_ids') || '[]');
+      } catch (e) {}
+
+      if (!this.isConfigured()) return new Set(localIds.map(String));
+
+      try {
+        const { data, error } = await this.client
+          .from('coupons')
+          .select('desc')
+          .eq('code', 'DELETED_ORDERS')
+          .limit(1);
+
+        if (!error && data && data[0]?.desc) {
+          const cloudIds = JSON.parse(data[0].desc);
+          if (Array.isArray(cloudIds)) {
+            const merged = [...new Set([...localIds, ...cloudIds].map(String))];
+            localStorage.setItem('mm_deleted_order_ids', JSON.stringify(merged));
+            return new Set(merged);
+          }
+        }
+      } catch (err) {
+        console.warn('[Supabase] fetchDeletedOrderIds error:', err);
+      }
+
+      return new Set(localIds.map(String));
+    }
+
     async fetchOrders() {
       if (!this.isConfigured()) return null;
       try {
+        let deletedOrderIds = new Set();
+        try {
+          deletedOrderIds = await this.fetchDeletedOrderIds();
+        } catch (e) {}
+
         const { data, error } = await this.client
           .from('orders')
           .select('*')
           .order('created_at', { ascending: false });
         if (error) throw error;
-        return data.map(o => ({
-          id: o.id,
-          customer: o.customer || {},
-          items: o.items || [],
-          subtotal: Number(o.subtotal || 0),
-          shipping: Number(o.shipping || 0),
-          total: Number(o.total || 0),
-          payment: o.payment || 'Cash on Delivery',
-          status: o.status || 'New',
-          timestamp: 'Just now',
-          rawDate: o.raw_date || new Date(o.created_at).toLocaleString('en-IN')
-        }));
+        return data
+          .filter(o => !deletedOrderIds.has(String(o.id)))
+          .map(o => ({
+            id: o.id,
+            customer: o.customer || {},
+            items: o.items || [],
+            subtotal: Number(o.subtotal || 0),
+            shipping: Number(o.shipping || 0),
+            total: Number(o.total || 0),
+            payment: o.payment || 'Cash on Delivery',
+            status: o.status || 'New',
+            timestamp: 'Just now',
+            rawDate: o.raw_date || new Date(o.created_at).toLocaleString('en-IN')
+          }));
       } catch (err) {
         console.warn('[Supabase] fetchOrders error:', err);
         return null;
@@ -363,10 +401,63 @@
     }
 
     async deleteOrder(orderId) {
-      if (!this.isConfigured()) return false;
+      if (!orderId) return false;
+
+      // 1. Mark as permanently deleted in localStorage so auto-sync never resurrects it
+      try {
+        const deletedOrderIds = JSON.parse(localStorage.getItem('mm_deleted_order_ids') || '[]');
+        if (!deletedOrderIds.includes(String(orderId))) {
+          deletedOrderIds.push(String(orderId));
+          localStorage.setItem('mm_deleted_order_ids', JSON.stringify(deletedOrderIds));
+        }
+      } catch (e) {}
+
+      // 2. Remove immediately from local cached orders list
+      try {
+        const localOrders = JSON.parse(localStorage.getItem('mm_orders') || '[]');
+        const filtered = localOrders.filter(o => String(o.id) !== String(orderId));
+        localStorage.setItem('mm_orders', JSON.stringify(filtered));
+        localStorage.setItem('mm_orders_timestamp', Date.now().toString());
+      } catch (e) {}
+
+      if (!this.isConfigured()) return true;
+
       try {
         const { error } = await this.client.from('orders').delete().eq('id', orderId);
-        if (error) throw error;
+        if (error) console.warn('[Supabase] orders.delete error:', error);
+
+        // 3. Persist deleted order ID to Supabase so ALL clients (live site, other browsers) know
+        try {
+          const { data: existing } = await this.client
+            .from('coupons')
+            .select('desc')
+            .eq('code', 'DELETED_ORDERS')
+            .limit(1);
+          const cloudDeletedOrderIds = JSON.parse((existing && existing[0]?.desc) || '[]');
+          if (!cloudDeletedOrderIds.includes(String(orderId))) {
+            cloudDeletedOrderIds.push(String(orderId));
+          }
+          await this.client.from('coupons').upsert({
+            code: 'DELETED_ORDERS',
+            discount: 0,
+            min_spend: 0,
+            desc: JSON.stringify(cloudDeletedOrderIds),
+            active: true,
+            uses: cloudDeletedOrderIds.length
+          });
+          console.log('[Supabase] Persisted deleted order ID to cloud:', orderId);
+        } catch (cloudErr) {
+          console.warn('[Supabase] Could not persist deleted order ID to cloud:', cloudErr);
+        }
+
+        // Broadcast to all tabs & storefront
+        window.dispatchEvent(new CustomEvent('mayza:cloud-orders-changed', {
+          detail: { eventType: 'DELETE', old: { id: orderId } }
+        }));
+        window.dispatchEvent(new CustomEvent('mayza:orders-updated', {
+          detail: { deletedId: orderId }
+        }));
+
         return true;
       } catch (err) {
         console.error('[Supabase] deleteOrder error:', err);
@@ -461,7 +552,7 @@
         const { data, error } = await this.client.from('coupons').select('*');
         if (error) throw error;
         return data
-          .filter(c => c.code !== 'STORE_BANNER' && c.code !== 'DELETED_PRODUCTS' && !String(c.code).startsWith('CART_'))
+          .filter(c => c.code !== 'STORE_BANNER' && c.code !== 'DELETED_PRODUCTS' && c.code !== 'DELETED_ORDERS' && !String(c.code).startsWith('CART_'))
           .map(c => ({
             code: c.code,
             discount: Number(c.discount),
@@ -759,13 +850,21 @@
           deletedProductIds = await this.fetchDeletedProductIds();
         } catch (e) {}
 
+        let deletedOrderIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_order_ids') || '[]'));
+        try {
+          deletedOrderIds = await this.fetchDeletedOrderIds();
+        } catch (e) {}
+
         // Fetch current cloud data
         const cloudData = await this.syncSupabaseToLocal();
         if (!cloudData) return null;
 
-        // Filter out any deleted products from cloud results
+        // Filter out any deleted products & orders from cloud results
         if (Array.isArray(cloudData.products)) {
           cloudData.products = cloudData.products.filter(p => !deletedProductIds.has(String(p.id)));
+        }
+        if (Array.isArray(cloudData.orders)) {
+          cloudData.orders = cloudData.orders.filter(o => !deletedOrderIds.has(String(o.id)));
         }
 
         const cloudProductIds = new Set((cloudData.products || []).map(p => String(p.id)));
@@ -774,7 +873,7 @@
 
         // Find any local items not yet stored in Supabase (excluding deleted items!)
         const pendingProducts = (localState.products || []).filter(p => p && p.id && !cloudProductIds.has(String(p.id)) && !deletedProductIds.has(String(p.id)));
-        const pendingOrders = (localState.orders || []).filter(o => o && o.id && !cloudOrderIds.has(String(o.id)));
+        const pendingOrders = (localState.orders || []).filter(o => o && o.id && !cloudOrderIds.has(String(o.id)) && !deletedOrderIds.has(String(o.id)));
         const pendingWholesale = (localState.wholesalePurchases || []).filter(w => w && w.id && !cloudWholesaleIds.has(String(w.id)));
 
         let pushedAny = false;
@@ -804,6 +903,9 @@
           const fresh = await this.syncSupabaseToLocal();
           if (fresh && Array.isArray(fresh.products)) {
             fresh.products = fresh.products.filter(p => !deletedProductIds.has(String(p.id)));
+          }
+          if (fresh && Array.isArray(fresh.orders)) {
+            fresh.orders = fresh.orders.filter(o => !deletedOrderIds.has(String(o.id)));
           }
           return fresh;
         }
@@ -1242,8 +1344,10 @@
       // If empty or offline, check local storage orders
       if (!fromSupabase || orders.length === 0) {
         try {
+          const deletedOrderIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_order_ids') || '[]'));
           const localOrders = JSON.parse(localStorage.getItem('mm_orders') || '[]');
           const localFiltered = localOrders.filter(o => {
+            if (deletedOrderIds.has(String(o.id))) return false;
             const cust = o.customer || {};
             const orderEmail = (cust.email || '').toLowerCase();
             const orderPhone = (cust.phone || '').trim();

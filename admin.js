@@ -53,8 +53,10 @@ class StudioState {
       localStorage.setItem("mm_demo_purged_v2", "true");
     }
 
-    this.products = this.load("mm_products", DEFAULT_PRODUCTS);
-    this.orders = this.load("mm_orders", DEFAULT_ORDERS);
+    const deletedProductIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]'));
+    const deletedOrderIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_order_ids') || '[]'));
+    this.products = (this.load("mm_products", DEFAULT_PRODUCTS) || []).filter(p => !deletedProductIds.has(String(p.id)));
+    this.orders = (this.load("mm_orders", DEFAULT_ORDERS) || []).filter(o => !deletedOrderIds.has(String(o.id)));
     this.coupons = this.load("mm_coupons", DEFAULT_COUPONS);
     this.vips = this.load("mm_vips", DEFAULT_VIPS);
     this.reviews = this.load("mm_reviews", DEFAULT_REVIEWS);
@@ -192,9 +194,16 @@ class StudioState {
           changed = true;
         }
         if (Array.isArray(data.orders)) {
-          const localOrderMap = new Map((this.orders || []).map(o => [o.id, o]));
-          (data.orders || []).forEach(o => localOrderMap.set(o.id, o));
-          this.orders = Array.from(localOrderMap.values()).sort((a, b) => (b.id > a.id ? 1 : -1));
+          let deletedOrderIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_order_ids') || '[]'));
+          if (window.mayzaSupabase && window.mayzaSupabase.fetchDeletedOrderIds) {
+            try {
+              deletedOrderIds = await window.mayzaSupabase.fetchDeletedOrderIds();
+            } catch(e) {}
+          }
+          const cleanCloud = (data.orders || []).filter(o => !deletedOrderIds.has(String(o.id)));
+          const cloudIdSet = new Set(cleanCloud.map(o => String(o.id)));
+          const pendingLocal = (this.orders || []).filter(o => !deletedOrderIds.has(String(o.id)) && !cloudIdSet.has(String(o.id)));
+          this.orders = [...cleanCloud, ...pendingLocal].sort((a, b) => (b.id > a.id ? 1 : -1));
           changed = true;
         }
         if (Array.isArray(data.wholesalePurchases)) {
@@ -712,22 +721,45 @@ function renderOrdersTable() {
   }).join("");
 }
 
-function deleteOrder(orderId) {
+async function deleteOrder(orderId) {
   const order = state.orders.find(o => o.id === orderId);
   if (!order) return;
 
   if (confirm(`Are you sure you want to delete order "${order.id}" (${order.customer.name} - ₹${order.total})?`)) {
+    // 1. Immediately remove from local state & UI
     state.orders = state.orders.filter(o => o.id !== orderId);
     state.save();
 
-    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
-      window.mayzaSupabase.deleteOrder?.(orderId).catch(console.warn);
-    }
+    // 2. Mark in localStorage deleted IDs
+    try {
+      const deletedOrderIds = JSON.parse(localStorage.getItem('mm_deleted_order_ids') || '[]');
+      if (!deletedOrderIds.includes(String(orderId))) {
+        deletedOrderIds.push(String(orderId));
+        localStorage.setItem('mm_deleted_order_ids', JSON.stringify(deletedOrderIds));
+      }
+    } catch (e) {}
 
-    audio.playClick();
+    // 3. Update localStorage mm_orders
+    try {
+      const localOrders = JSON.parse(localStorage.getItem('mm_orders') || '[]');
+      const filtered = localOrders.filter(o => String(o.id) !== String(orderId));
+      localStorage.setItem('mm_orders', JSON.stringify(filtered));
+      localStorage.setItem('mm_orders_timestamp', Date.now().toString());
+    } catch (e) {}
+
+    audio?.playClick();
     showToast(`Deleted order ${order.id}.`);
     renderOrdersTable();
     renderDashboardOverview();
+
+    // 4. Delete permanently from Supabase & cloud registry
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      try {
+        await window.mayzaSupabase.deleteOrder(orderId);
+      } catch (err) {
+        console.warn('Supabase deleteOrder error:', err);
+      }
+    }
   }
 }
 
@@ -2912,7 +2944,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Real-time live online orders listener from Storefront (cross-tab sync)
   window.addEventListener("storage", (e) => {
     if (e.key === "mm_orders" || e.key === "mm_orders_timestamp") {
-      state.orders = state.load("mm_orders", DEFAULT_ORDERS);
+      const deletedOrderIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_order_ids') || '[]'));
+      const rawOrders = state.load("mm_orders", DEFAULT_ORDERS);
+      state.orders = (rawOrders || []).filter(o => !deletedOrderIds.has(String(o.id)));
       renderOrdersTable();
       renderDashboardOverview();
       audio?.playBubblePop(880);
@@ -2920,10 +2954,15 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   window.addEventListener("mayza:orders-updated", (e) => {
+    const deletedOrderIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_order_ids') || '[]'));
+    if (e.detail?.deletedId) {
+      deletedOrderIds.add(String(e.detail.deletedId));
+    }
     if (e.detail?.orders) {
-      state.orders = e.detail.orders;
+      state.orders = e.detail.orders.filter(o => !deletedOrderIds.has(String(o.id)));
     } else {
-      state.orders = state.load("mm_orders", DEFAULT_ORDERS);
+      const rawOrders = state.load("mm_orders", DEFAULT_ORDERS);
+      state.orders = (rawOrders || []).filter(o => !deletedOrderIds.has(String(o.id)));
     }
     renderOrdersTable();
     renderDashboardOverview();
@@ -3466,14 +3505,23 @@ function initSupabaseManager() {
 
   window.addEventListener("mayza:cloud-orders-changed", async (e) => {
     console.log("[Admin Realtime] Orders updated in cloud:", e.detail?.eventType);
+    let deletedOrderIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_order_ids') || '[]'));
+    if (window.mayzaSupabase && window.mayzaSupabase.fetchDeletedOrderIds) {
+      try {
+        deletedOrderIds = await window.mayzaSupabase.fetchDeletedOrderIds();
+      } catch (err) {}
+    }
+    if (e.detail?.old?.id) {
+      deletedOrderIds.add(String(e.detail.old.id));
+    }
     const prevCount = state.orders.length;
     const orders = await window.mayzaSupabase.fetchOrders();
     if (Array.isArray(orders)) {
-      state.orders = orders;
+      state.orders = orders.filter(o => !deletedOrderIds.has(String(o.id)));
       state.save();
       renderOrdersTable();
       renderDashboardOverview();
-      if (orders.length > prevCount) {
+      if (orders.length > prevCount && e.detail?.eventType !== 'DELETE') {
         showToast("🔔 New Live Storefront Order Received! 🛍️", "success");
         audio?.playSuccess();
         triggerCelebration();
