@@ -1263,6 +1263,7 @@
       }
 
       let updatedInCloud = false;
+      let updatedInLocal = false;
 
       // Update in Supabase
       if (this.isConfigured()) {
@@ -1271,16 +1272,6 @@
             .from('customers')
             .update({ password: newPassword })
             .ilike('email', cleanEmail);
-
-          if (!error) {
-            updatedInCloud = true;
-          } else {
-            console.warn('[Supabase] resetCustomerPassword cloud update error:', error.message);
-          }
-        } catch (err) {
-          console.warn('[Supabase] resetCustomerPassword cloud error:', err);
-        }
-      }
 
           if (!error) {
             updatedInCloud = true;
