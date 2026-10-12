@@ -1599,6 +1599,11 @@ class MayzaEntranceApp {
   // CUSTOMER AUTH & DASHBOARD ORCHESTRATION
   // =========================================================
   initCustomerAuthAndDashboard() {
+    // Auto-sync customer accounts between local storage and Supabase Cloud
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      window.mayzaSupabase.syncCustomersToCloud?.().catch(console.warn);
+    }
+
     const authModal = document.getElementById('customerAuthModal');
     const closeAuthBtn = document.getElementById('closeCustomerAuthModalBtn');
     const dashModal = document.getElementById('customerDashboardModal');
