@@ -46,6 +46,23 @@
         this.client = null;
         this.isConnected = false;
         this.notifyStatus(false, this.url ? 'Waiting for Supabase library' : 'Credentials not configured');
+
+        // Automatically retry when the Supabase CDN script finishes loading
+        if (typeof window !== 'undefined' && !this._libWatchStarted) {
+          this._libWatchStarted = true;
+          const retryInit = () => {
+            if (!this.client && window.supabase && typeof window.supabase.createClient === 'function') {
+              this.init();
+            }
+          };
+          setTimeout(retryInit, 200);
+          setTimeout(retryInit, 600);
+          setTimeout(retryInit, 1500);
+          window.addEventListener('DOMContentLoaded', retryInit, { once: true });
+          window.addEventListener('load', retryInit, { once: true });
+        }
+        // Always attempt background sync via direct REST even before SDK loads
+        this.syncCustomersToCloud();
       }
     }
 
@@ -1018,13 +1035,121 @@
       this.setCurrentCustomer(null);
     }
 
-    // Auto-sync local accounts with Supabase Cloud (two-way sync)
+    // =========================================================
+    // UNIVERSAL CLOUD AUTH ENGINE (WORKS ON ALL BROWSERS & DEVICES)
+    // Direct native REST fallback guarantees authentication works even if CDN scripts fail
+    // =========================================================
+    async _cloudCustomerFetch(endpoint, options = {}) {
+      const baseUrl = this.url || DEFAULT_URL;
+      const apiKey = this.key || DEFAULT_KEY;
+      const url = `${baseUrl.replace(/\/+$/, '')}/rest/v1/${endpoint}`;
+      const headers = {
+        'apikey': apiKey,
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      };
+      return window.fetch(url, { ...options, headers });
+    }
+
+    async getCloudCustomerByEmail(email) {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      if (!cleanEmail) return null;
+
+      // 1. Try Supabase Client SDK if ready
+      if (this.isConfigured()) {
+        try {
+          const { data, error } = await this.client
+            .from('customers')
+            .select('*')
+            .ilike('email', cleanEmail)
+            .limit(1);
+
+          if (!error && Array.isArray(data) && data.length > 0) {
+            return data[0];
+          }
+        } catch (e) {
+          console.warn('[Auth] Supabase SDK query error, falling back to direct REST:', e);
+        }
+      }
+
+      // 2. Direct REST API query fallback (works 100% on any browser or device)
+      try {
+        const res = await this._cloudCustomerFetch(`customers?email=ilike.${encodeURIComponent(cleanEmail)}&select=*`);
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0) {
+            return list[0];
+          }
+        }
+      } catch (err) {
+        console.error('[Auth] Direct REST customer query failed:', err);
+      }
+
+      return null;
+    }
+
+    async saveCloudCustomerRecord(customer) {
+      // 1. Try Supabase Client SDK if ready
+      if (this.isConfigured()) {
+        try {
+          const { error } = await this.client.from('customers').upsert([customer], { onConflict: 'email' });
+          if (!error) return { success: true };
+          const { error: insErr } = await this.client.from('customers').insert([customer]);
+          if (!insErr) return { success: true };
+        } catch (e) {
+          console.warn('[Auth] Supabase SDK save error, trying REST fallback:', e);
+        }
+      }
+
+      // 2. Direct REST API upsert fallback
+      try {
+        const res = await this._cloudCustomerFetch('customers?on_conflict=email', {
+          method: 'POST',
+          headers: {
+            'Prefer': 'resolution=merge-duplicates,return=representation'
+          },
+          body: JSON.stringify(customer)
+        });
+        if (res.ok) return { success: true };
+        const errText = await res.text();
+        return { success: false, error: errText };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    }
+
+    async updateCloudCustomerPassword(email, newPassword) {
+      const cleanEmail = (email || '').trim().toLowerCase();
+      // 1. Try SDK
+      if (this.isConfigured()) {
+        try {
+          const { error } = await this.client
+            .from('customers')
+            .update({ password: newPassword })
+            .ilike('email', cleanEmail);
+          if (!error) return true;
+        } catch (e) {}
+      }
+
+      // 2. Direct REST PATCH fallback
+      try {
+        const res = await this._cloudCustomerFetch(`customers?email=ilike.${encodeURIComponent(cleanEmail)}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ password: newPassword })
+        });
+        return res.ok;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // Auto-sync local accounts with Supabase Cloud (two-way global sync)
     async syncCustomersToCloud() {
-      if (!this.isConfigured()) return;
       try {
         const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
 
-        // 1. Push any local customers to Supabase
+        // 1. Push any local accounts to Supabase Cloud
         if (Array.isArray(localCusts) && localCusts.length > 0) {
           for (const c of localCusts) {
             if (c.email && c.password) {
@@ -1037,16 +1162,26 @@
                 password: c.password,
                 created_at: c.created_at || new Date().toISOString()
               };
-              const { error } = await this.client.from('customers').upsert([row], { onConflict: 'email' });
-              if (error) {
-                await this.client.from('customers').insert([row]).catch(() => {});
-              }
+              await this.saveCloudCustomerRecord(row).catch(() => {});
             }
           }
         }
 
         // 2. Pull all cloud customers and cache them locally for offline access
-        const { data: cloudUsers } = await this.client.from('customers').select('*');
+        let cloudUsers = null;
+        if (this.isConfigured()) {
+          try {
+            const { data } = await this.client.from('customers').select('*');
+            if (Array.isArray(data)) cloudUsers = data;
+          } catch (e) {}
+        }
+        if (!cloudUsers) {
+          try {
+            const res = await this._cloudCustomerFetch('customers?select=*');
+            if (res.ok) cloudUsers = await res.json();
+          } catch (e) {}
+        }
+
         if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
           const mergedMap = new Map();
           cloudUsers.forEach(u => mergedMap.set((u.email || '').toLowerCase().trim(), u));
@@ -1055,7 +1190,7 @@
             if (!mergedMap.has(k)) mergedMap.set(k, u);
           });
           localStorage.setItem('mm_local_customers', JSON.stringify(Array.from(mergedMap.values())));
-          console.log(`[Auth] Synced ${cloudUsers.length} customer accounts from cloud.`);
+          console.log(`[Auth] Synced ${cloudUsers.length} customer accounts globally.`);
         }
       } catch (err) {
         console.warn('[Supabase] syncCustomersToCloud error:', err);
@@ -1072,6 +1207,12 @@
         return { success: false, message: 'Name, email and password are required.' };
       }
 
+      // 1. Check if account already exists in cloud
+      const existing = await this.getCloudCustomerByEmail(cleanEmail);
+      if (existing) {
+        return { success: false, message: 'An account with this email already exists. Please sign in!' };
+      }
+
       const newCustomer = {
         id: 'CUST-' + Math.floor(100000 + Math.random() * 900000),
         name: cleanName,
@@ -1082,37 +1223,15 @@
         created_at: new Date().toISOString()
       };
 
-      // 1. Save directly to Supabase Cloud PostgreSQL
-      if (this.isConfigured()) {
-        try {
-          const { data: existing, error: checkErr } = await this.client
-            .from('customers')
-            .select('id')
-            .ilike('email', cleanEmail)
-            .limit(1);
-
-          if (!checkErr && existing && existing.length > 0) {
-            return { success: false, message: 'An account with this email already exists. Please sign in!' };
-          }
-
-          let { error: insErr } = await this.client.from('customers').upsert([newCustomer], { onConflict: 'email' });
-          if (insErr) {
-            console.warn('[Supabase] Customer upsert failed, retrying direct insert:', insErr.message);
-            const retryRes = await this.client.from('customers').insert([newCustomer]);
-            insErr = retryRes.error;
-          }
-
-          if (insErr) {
-            console.error('[Supabase] Customer cloud save error:', insErr);
-          } else {
-            console.log('[Supabase] ✅ Successfully saved customer to cloud:', cleanEmail);
-          }
-        } catch (err) {
-          console.warn('[Supabase] Customer register cloud error:', err);
-        }
+      // 2. Save directly to Supabase Cloud PostgreSQL (works from any device)
+      const saveRes = await this.saveCloudCustomerRecord(newCustomer);
+      if (!saveRes.success) {
+        console.warn('[Supabase] Cloud save warning:', saveRes.error);
+      } else {
+        console.log('[Supabase] ✅ Successfully saved customer to cloud globally:', cleanEmail);
       }
 
-      // 2. Save locally for instant offline session
+      // 3. Cache locally for instant access
       try {
         const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
         const idx = localCusts.findIndex(c => (c.email || '').toLowerCase() === cleanEmail);
@@ -1142,52 +1261,35 @@
         return { success: false, message: 'Please enter both email and password.' };
       }
 
-      // 1. Check Supabase Cloud database first (works across all sites & devices)
-      if (this.isConfigured()) {
-        try {
-          console.log('[Auth] Querying Supabase customers table for:', cleanEmail);
-          const { data, error } = await this.client
-            .from('customers')
-            .select('*')
-            .ilike('email', cleanEmail)
-            .limit(1);
+      // 1. Check Supabase Cloud database first (Universal across all devices & browsers)
+      const cloudUser = await this.getCloudCustomerByEmail(cleanEmail);
+      if (cloudUser) {
+        console.log('[Auth] ✅ Found user in Supabase cloud:', cloudUser.email);
+        if (cloudUser.password === password) {
+          const safeCustomer = {
+            id: cloudUser.id,
+            name: cloudUser.name,
+            email: cloudUser.email,
+            phone: cloudUser.phone,
+            address: cloudUser.address
+          };
+          this.setCurrentCustomer(safeCustomer);
 
-          if (error) {
-            console.error('[Auth] Supabase customers query error:', error.code, error.message);
-          } else if (data && data.length > 0) {
-            const user = data[0];
-            console.log('[Auth] ✅ Found user in Supabase cloud:', user.email);
-            if (user.password === password) {
-              const safeCustomer = {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                phone: user.phone,
-                address: user.address
-              };
-              this.setCurrentCustomer(safeCustomer);
-
-              // Cache user locally for offline access
-              try {
-                const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
-                const idx = localCusts.findIndex(c => (c.email || '').toLowerCase() === cleanEmail);
-                if (idx !== -1) {
-                  localCusts[idx] = user;
-                } else {
-                  localCusts.push(user);
-                }
-                localStorage.setItem('mm_local_customers', JSON.stringify(localCusts));
-              } catch (e) {}
-
-              return { success: true, customer: safeCustomer };
+          // Cache user locally for offline access
+          try {
+            const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
+            const idx = localCusts.findIndex(c => (c.email || '').toLowerCase() === cleanEmail);
+            if (idx !== -1) {
+              localCusts[idx] = cloudUser;
             } else {
-              return { success: false, message: 'Incorrect password. Please try again.' };
+              localCusts.push(cloudUser);
             }
-          } else {
-            console.log('[Auth] No user found in Supabase cloud with email:', cleanEmail);
-          }
-        } catch (err) {
-          console.error('[Auth] Login cloud exception:', err.message, err);
+            localStorage.setItem('mm_local_customers', JSON.stringify(localCusts));
+          } catch (e) {}
+
+          return { success: true, customer: safeCustomer };
+        } else {
+          return { success: false, message: 'Incorrect password. Please try again.' };
         }
       }
 
@@ -1206,11 +1308,8 @@
             };
             this.setCurrentCustomer(safeCustomer);
 
-            // Auto-push to Supabase so it's permanently synced across all devices
-            if (this.isConfigured()) {
-              this.client.from('customers').upsert([found], { onConflict: 'email' })
-                .catch(() => this.client.from('customers').insert([found]).catch(() => {}));
-            }
+            // Auto-push to Supabase so it's permanently available on all desktops
+            this.saveCloudCustomerRecord(found).catch(console.warn);
 
             return { success: true, customer: safeCustomer };
           } else {
@@ -1227,20 +1326,9 @@
       if (!cleanEmail) return { exists: false, message: 'Please enter an email address.' };
 
       // Check cloud database
-      if (this.isConfigured()) {
-        try {
-          const { data, error } = await this.client
-            .from('customers')
-            .select('id, name, email')
-            .ilike('email', cleanEmail)
-            .limit(1);
-
-          if (!error && data && data.length > 0) {
-            return { exists: true, name: data[0].name, email: data[0].email };
-          }
-        } catch (err) {
-          console.warn('[Supabase] checkCustomerEmailExists error:', err);
-        }
+      const cloudUser = await this.getCloudCustomerByEmail(cleanEmail);
+      if (cloudUser) {
+        return { exists: true, name: cloudUser.name, email: cloudUser.email };
       }
 
       // Check local storage fallback
@@ -1262,26 +1350,8 @@
         return { success: false, message: 'New password must be at least 6 characters long.' };
       }
 
-      let updatedInCloud = false;
+      let updatedInCloud = await this.updateCloudCustomerPassword(cleanEmail, newPassword);
       let updatedInLocal = false;
-
-      // Update in Supabase
-      if (this.isConfigured()) {
-        try {
-          const { error } = await this.client
-            .from('customers')
-            .update({ password: newPassword })
-            .ilike('email', cleanEmail);
-
-          if (!error) {
-            updatedInCloud = true;
-          } else {
-            console.warn('[Supabase] resetCustomerPassword cloud update error:', error.message);
-          }
-        } catch (err) {
-          console.warn('[Supabase] resetCustomerPassword cloud error:', err);
-        }
-      }
 
       // Update in localStorage
       try {
@@ -1308,20 +1378,28 @@
       const updated = { ...current, ...updatedData };
       this.setCurrentCustomer(updated);
 
+      const cleanEmail = (current.email || '').trim().toLowerCase();
+      const payload = {
+        name: updated.name,
+        phone: updated.phone,
+        address: updated.address
+      };
+
       if (this.isConfigured()) {
         try {
-          await this.client
-            .from('customers')
-            .update({
-              name: updated.name,
-              phone: updated.phone,
-              address: updated.address
-            })
-            .eq('email', current.email);
+          await this.client.from('customers').update(payload).ilike('email', cleanEmail);
         } catch (e) {
           console.warn('[Supabase] updateCustomerProfile cloud error:', e);
         }
       }
+
+      try {
+        await this._cloudCustomerFetch(`customers?email=ilike.${encodeURIComponent(cleanEmail)}`, {
+          method: 'PATCH',
+          body: JSON.stringify(payload)
+        });
+      } catch (e) {}
+
       return { success: true, customer: updated };
     }
 
