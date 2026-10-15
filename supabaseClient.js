@@ -1090,33 +1090,68 @@
     }
 
     async saveCloudCustomerRecord(customer) {
+      const cleanEmail = (customer.email || '').trim().toLowerCase();
+      if (!cleanEmail) return { success: false, error: 'No email provided' };
+
+      const existing = await this.getCloudCustomerByEmail(cleanEmail).catch(() => null);
+
       // 1. Try Supabase Client SDK if ready
       if (this.isConfigured()) {
         try {
-          const { error } = await this.client.from('customers').upsert([customer], { onConflict: 'email' });
-          if (!error) return { success: true };
-          const { error: insErr } = await this.client.from('customers').insert([customer]);
-          if (!insErr) return { success: true };
+          if (existing) {
+            const { error } = await this.client
+              .from('customers')
+              .update(customer)
+              .ilike('email', cleanEmail);
+            if (!error) {
+              console.log('[Auth] ✅ Updated customer in cloud via SDK:', cleanEmail);
+              return { success: true };
+            }
+          } else {
+            const { error } = await this.client
+              .from('customers')
+              .insert([customer]);
+            if (!error) {
+              console.log('[Auth] ✅ Inserted customer to cloud via SDK:', cleanEmail);
+              return { success: true };
+            }
+          }
         } catch (e) {
           console.warn('[Auth] Supabase SDK save error, trying REST fallback:', e);
         }
       }
 
-      // 2. Direct REST API upsert fallback
+      // 2. Direct REST API fallback
       try {
-        const res = await this._cloudCustomerFetch('customers?on_conflict=email', {
-          method: 'POST',
-          headers: {
-            'Prefer': 'resolution=merge-duplicates,return=representation'
-          },
-          body: JSON.stringify(customer)
-        });
-        if (res.ok) return { success: true };
-        const errText = await res.text();
-        return { success: false, error: errText };
+        if (existing) {
+          const res = await this._cloudCustomerFetch(`customers?email=ilike.${encodeURIComponent(cleanEmail)}`, {
+            method: 'PATCH',
+            body: JSON.stringify(customer)
+          });
+          if (res.ok) {
+            console.log('[Auth] ✅ Updated customer in cloud via REST:', cleanEmail);
+            return { success: true };
+          }
+        } else {
+          const res = await this._cloudCustomerFetch('customers', {
+            method: 'POST',
+            headers: { 'Prefer': 'return=representation' },
+            body: JSON.stringify(customer)
+          });
+          if (res.ok) {
+            console.log('[Auth] ✅ Inserted customer to cloud via REST:', cleanEmail);
+            return { success: true };
+          }
+          const errText = await res.text();
+          console.warn('[Auth] REST save failed:', res.status, errText);
+          return { success: false, error: errText };
+        }
       } catch (err) {
+        console.warn('[Auth] REST save error:', err.message);
         return { success: false, error: err.message };
       }
+
+      return { success: false, error: 'Unknown save failure' };
     }
 
     async updateCloudCustomerPassword(email, newPassword) {
@@ -1148,21 +1183,25 @@
     async syncCustomersToCloud() {
       try {
         const localCusts = JSON.parse(localStorage.getItem('mm_local_customers') || '[]');
+        console.log(`[Auth] Starting sync — ${localCusts.length} local account(s) found.`);
 
         // 1. Push any local accounts to Supabase Cloud
         if (Array.isArray(localCusts) && localCusts.length > 0) {
           for (const c of localCusts) {
-            if (c.email && c.password) {
+            if (c.email) {
               const row = {
                 id: c.id || ('CUST-' + Math.floor(100000 + Math.random() * 900000)),
                 name: c.name || 'Valued Customer',
                 email: c.email.trim().toLowerCase(),
                 phone: c.phone || '',
                 address: c.address || '',
-                password: c.password,
+                password: c.password || '',
                 created_at: c.created_at || new Date().toISOString()
               };
-              await this.saveCloudCustomerRecord(row).catch(() => {});
+              const result = await this.saveCloudCustomerRecord(row).catch(e => ({ success: false, error: e.message }));
+              if (result && !result.success) {
+                console.warn('[Auth] Failed to push to cloud:', c.email, result.error);
+              }
             }
           }
         }

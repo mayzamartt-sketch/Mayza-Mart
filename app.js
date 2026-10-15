@@ -1600,7 +1600,8 @@ class MayzaEntranceApp {
   // =========================================================
   initCustomerAuthAndDashboard() {
     // Auto-sync customer accounts between local storage and Supabase Cloud
-    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+    // Note: syncCustomersToCloud handles SDK vs REST fallback internally, so no guard needed
+    if (window.mayzaSupabase) {
       window.mayzaSupabase.syncCustomersToCloud?.().catch(console.warn);
     }
 
