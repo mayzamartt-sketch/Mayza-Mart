@@ -894,6 +894,7 @@ class MayzaEntranceApp {
             !customTitles.has(d.title.toLowerCase().trim()) && !deletedIds.has(String(d.id))
           );
           renderProducts([...cleanCloud, ...remainingDefaults]);
+          this.syncLiveCategories();
         }
       } catch (err) {
         console.warn('[Storefront] syncLiveProducts error:', err);
@@ -909,6 +910,7 @@ class MayzaEntranceApp {
           const customTitles = new Set(cleanList.map(c => (c.title || '').toLowerCase().trim()));
           const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()) && !deletedIds.has(String(d.id)));
           renderProducts([...cleanList, ...remainingDefaults]);
+          this.syncLiveCategories();
         } else {
           this.syncLiveProducts();
         }
@@ -1036,8 +1038,29 @@ class MayzaEntranceApp {
         });
       }
     } catch(e) {}
+
     const uniqueCustom = formattedCustom.filter(c => !defaultNames.has((c.name || '').toLowerCase().trim()));
     const allCategories = [...defaultCategories, ...uniqueCustom];
+    const knownNames = new Set(allCategories.map(c => (c.name || '').toLowerCase().trim()));
+
+    // Dynamically extract categories from all loaded products so products with new categories always show up
+    try {
+      const storedProds = JSON.parse(localStorage.getItem('mm_products') || '[]');
+      storedProds.forEach(p => {
+        const pCat = (p.category || '').trim();
+        if (pCat && !knownNames.has(pCat.toLowerCase())) {
+          knownNames.add(pCat.toLowerCase());
+          allCategories.push({
+            name: pCat,
+            emoji: '🏷️',
+            image: p.image || 'assets/cat-return-gifts.jpg',
+            subtitle: 'Explore collection',
+            colorClass: colorCycle[allCategories.length % colorCycle.length],
+            isCustom: true
+          });
+        }
+      });
+    } catch (e) {}
 
     // 1. Render Category Strip (Horizontal pill bar)
     if (strip) {
@@ -1076,14 +1099,43 @@ class MayzaEntranceApp {
     // 3. Bind click events on category links to filter products in bestsellers
     this.bindCategoryFilterClicks();
 
-    // 4. Setup listeners for real-time updates from Admin or another tab
+    // 4. Asynchronously fetch latest categories from Supabase cloud (for live visitors / multi-device sync)
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured() && !this._fetchingCloudCategories) {
+      this._fetchingCloudCategories = true;
+      window.mayzaSupabase.fetchStoreCategories().then(cloudCats => {
+        this._fetchingCloudCategories = false;
+        if (cloudCats && Array.isArray(cloudCats.customCategories)) {
+          const currentCount = (JSON.parse(localStorage.getItem('mm_custom_categories') || '[]')).length;
+          if (cloudCats.customCategories.length !== currentCount || cloudCats.categoryOverrides) {
+            // Re-render with fresh cloud categories if count or overrides changed
+            this.syncLiveCategories();
+          }
+        }
+      }).catch(err => {
+        this._fetchingCloudCategories = false;
+        console.warn('[Storefront] Cloud categories fetch warning:', err);
+      });
+    }
+
+    // 5. Setup listeners for real-time updates from Admin or Supabase cloud
     if (!this.hasCategoryListeners) {
       this.hasCategoryListeners = true;
       window.addEventListener('mayza:categories-updated', () => {
         this.syncLiveCategories();
       });
+      window.addEventListener('mayza:cloud-categories-changed', () => {
+        console.log('[Storefront Realtime] Cloud categories updated');
+        if (window.mayzaSupabase?.fetchStoreCategories) {
+          window.mayzaSupabase.fetchStoreCategories().then(() => this.syncLiveCategories());
+        } else {
+          this.syncLiveCategories();
+        }
+      });
+      window.addEventListener('mayza:cloud-products-changed', () => {
+        this.syncLiveCategories();
+      });
       window.addEventListener('storage', (e) => {
-        if (e.key === 'mm_custom_categories' || e.key === 'mm_categories_timestamp') {
+        if (e.key === 'mm_custom_categories' || e.key === 'mm_categories_timestamp' || e.key === 'mm_category_overrides' || e.key === 'mm_products') {
           this.syncLiveCategories();
         }
       });

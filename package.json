@@ -4,6 +4,10 @@
   "description": "Mayza Mart Storefront & Wonderland Studio Admin",
   "scripts": {
     "build": "echo 'Static build ready'",
+    "start": "node local-server.js",
     "dev": "node local-server.js"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
   }
 }

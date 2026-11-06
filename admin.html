@@ -127,6 +127,13 @@
           <span class="ext-icon">↗</span>
         </a>
 
+        <!-- Visiting Card & Scanner Code -->
+        <a href="/visiting-card.html" target="_blank" class="live-store-pill" style="background: rgba(217, 101, 123, 0.12); color: #8E2D40; border-color: rgba(217, 101, 123, 0.3);" title="Open Visiting Card & QR Scanner Suite">
+          <span>📇</span>
+          <span class="pill-text">Visiting Card &amp; QR</span>
+          <span class="ext-icon">↗</span>
+        </a>
+
         <!-- Sound FX Audio Toggle -->
         <button class="studio-icon-btn" id="soundToggleBtn" title="Toggle UI Sound Effects" aria-label="Toggle Sound Effects">
           <span class="sound-icon" id="soundIcon">🔊</span>
@@ -969,9 +976,14 @@
         <button class="modal-close-btn" id="closeManageCategoriesBtn">&times;</button>
       </div>
       <div class="modal-body" style="padding:0 24px 24px;">
-        <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:18px;">
-          Click any category card to update its picture, name, and subtitle as shown in the live store.
-        </p>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+          <p style="font-size:0.85rem; color:var(--text-muted); margin:0;">
+            Click any category to update its picture and details, or click <strong>＋ Add New Category</strong> to create one.
+          </p>
+          <button type="button" class="action-btn primary-glow-btn" id="manageModalAddNewCatBtn" style="padding:6px 14px; font-size:0.82rem;">
+            <span>＋ Add New Category</span>
+          </button>
+        </div>
 
         <!-- Categories Grid -->
         <div class="manage-cat-grid" id="manageCatGrid">
@@ -1020,6 +1032,9 @@
               <div class="manage-cat-edit-actions">
                 <button type="button" class="action-btn primary-glow-btn" id="saveCatChangesBtn">
                   <span>💾 Save Changes</span>
+                </button>
+                <button type="button" class="action-btn ghost-btn text-danger" id="deleteCatBtn" style="display:none;">
+                  <span>🗑️ Delete Category</span>
                 </button>
                 <button type="button" class="action-btn secondary-btn" id="cancelCatChangesBtn">Cancel</button>
               </div>

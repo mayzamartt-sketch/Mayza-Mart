@@ -5,6 +5,8 @@
   ],
   "routes": [
     { "src": "/admin", "dest": "/admin.html" },
+    { "src": "/visiting-card", "dest": "/visiting-card.html" },
+    { "src": "/card", "dest": "/visiting-card.html" },
     { "src": "/(.*)", "dest": "/$1" }
   ]
 }

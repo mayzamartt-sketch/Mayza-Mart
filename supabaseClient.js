@@ -87,6 +87,10 @@
             const code = String(payload.new?.code || payload.old?.code || '');
             if (code.startsWith('CART_')) {
               window.dispatchEvent(new CustomEvent('mayza:cloud-cart-changed', { detail: payload }));
+            } else if (code === 'STORE_CATEGORIES') {
+              window.dispatchEvent(new CustomEvent('mayza:cloud-categories-changed', { detail: payload }));
+            } else if (code === 'STORE_BANNER') {
+              window.dispatchEvent(new CustomEvent('mayza:cloud-banner-changed', { detail: payload }));
             } else {
               window.dispatchEvent(new CustomEvent('mayza:cloud-coupons-changed', { detail: payload }));
             }
@@ -570,7 +574,7 @@
         const { data, error } = await this.client.from('coupons').select('*');
         if (error) throw error;
         return data
-          .filter(c => c.code !== 'STORE_BANNER' && c.code !== 'DELETED_PRODUCTS' && c.code !== 'DELETED_ORDERS' && !String(c.code).startsWith('CART_'))
+          .filter(c => c.code !== 'STORE_BANNER' && c.code !== 'STORE_CATEGORIES' && c.code !== 'DELETED_PRODUCTS' && c.code !== 'DELETED_ORDERS' && !String(c.code).startsWith('CART_'))
           .map(c => ({
             code: c.code,
             discount: Number(c.discount),
@@ -677,6 +681,89 @@
       return true;
     }
 
+    // =========================================================
+    // STORE CATEGORIES & OVERRIDES CLOUD PERSISTENCE
+    // =========================================================
+    async fetchStoreCategories() {
+      let custom = [];
+      let overrides = {};
+      try {
+        const c = localStorage.getItem('mm_custom_categories');
+        if (c) custom = JSON.parse(c);
+      } catch (e) {}
+      try {
+        const o = localStorage.getItem('mm_category_overrides');
+        if (o) overrides = JSON.parse(o);
+      } catch (e) {}
+
+      if (!this.isConfigured()) {
+        return { customCategories: custom, categoryOverrides: overrides };
+      }
+
+      try {
+        const { data, error } = await this.client
+          .from('coupons')
+          .select('*')
+          .eq('code', 'STORE_CATEGORIES')
+          .limit(1);
+
+        if (!error && data && data.length > 0 && data[0].desc) {
+          const parsed = JSON.parse(data[0].desc);
+          if (parsed && typeof parsed === 'object') {
+            if (Array.isArray(parsed.customCategories)) {
+              custom = parsed.customCategories;
+              localStorage.setItem('mm_custom_categories', JSON.stringify(custom));
+            }
+            if (parsed.categoryOverrides && typeof parsed.categoryOverrides === 'object') {
+              overrides = parsed.categoryOverrides;
+              localStorage.setItem('mm_category_overrides', JSON.stringify(overrides));
+            }
+            return { customCategories: custom, categoryOverrides: overrides };
+          }
+        }
+      } catch (err) {
+        console.warn('[Supabase] fetchStoreCategories error:', err);
+      }
+
+      return { customCategories: custom, categoryOverrides: overrides };
+    }
+
+    async saveStoreCategories(customCategories, categoryOverrides) {
+      const custom = Array.isArray(customCategories) ? customCategories : [];
+      const overrides = (categoryOverrides && typeof categoryOverrides === 'object') ? categoryOverrides : {};
+
+      localStorage.setItem('mm_custom_categories', JSON.stringify(custom));
+      localStorage.setItem('mm_category_overrides', JSON.stringify(overrides));
+      localStorage.setItem('mm_categories_timestamp', Date.now().toString());
+
+      if (this.isConfigured()) {
+        try {
+          const payload = JSON.stringify({
+            customCategories: custom,
+            categoryOverrides: overrides,
+            updatedAt: new Date().toISOString()
+          });
+          const row = {
+            code: 'STORE_CATEGORIES',
+            discount: 0,
+            min_spend: 0,
+            desc: payload,
+            active: true,
+            uses: custom.length
+          };
+          await this.client.from('coupons').upsert(row);
+          console.log('[Supabase] Persisted store categories to cloud:', custom.length);
+        } catch (err) {
+          console.warn('[Supabase] saveStoreCategories error:', err);
+        }
+      }
+
+      window.dispatchEvent(new CustomEvent('mayza:categories-updated', {
+        detail: { categories: custom, customCategories: custom, categoryOverrides: overrides }
+      }));
+      return true;
+    }
+
     async fetchVips() {
       if (!this.isConfigured()) return null;
       try {
@@ -724,7 +811,8 @@
         products: 0,
         orders: 0,
         wholesale: 0,
-        coupons: 0
+        coupons: 0,
+        categories: 0
       };
 
       // 1. Sync Products safely
@@ -834,19 +922,31 @@
         }
       }
 
+      // 5. Sync Categories & Overrides safely
+      if (Array.isArray(localState.customCategories) && localState.customCategories.length > 0) {
+        try {
+          const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+          await this.saveStoreCategories(localState.customCategories, overrides);
+          results.categories = localState.customCategories.length;
+        } catch(e) {
+          console.warn('[Supabase Sync] Categories push error:', e.message);
+        }
+      }
+
       this.lastSyncTime = new Date();
       return results;
     }
 
     async syncSupabaseToLocal() {
       if (!this.isConfigured()) return null;
-      const [products, orders, wholesale, coupons, vips, reviews] = await Promise.all([
+      const [products, orders, wholesale, coupons, vips, reviews, categories] = await Promise.all([
         this.fetchProducts(),
         this.fetchOrders(),
         this.fetchWholesale(),
         this.fetchCoupons(),
         this.fetchVips(),
-        this.fetchReviews()
+        this.fetchReviews(),
+        this.fetchStoreCategories()
       ]);
 
       return {
@@ -855,7 +955,8 @@
         wholesalePurchases: wholesale || undefined,
         coupons: coupons || undefined,
         vips: vips || undefined,
-        reviews: reviews || undefined
+        reviews: reviews || undefined,
+        categories: categories || undefined
       };
     }
 
@@ -913,6 +1014,21 @@
           console.log(`[Supabase Auto-Sync] Pushing ${pendingWholesale.length} local wholesale entries to cloud...`);
           for (const w of pendingWholesale) {
             try { await this.upsertWholesale(w); pushedAny = true; } catch (e) {}
+          }
+        }
+
+        // Check if local has custom categories to merge with cloud
+        if (Array.isArray(localState.customCategories) && localState.customCategories.length > 0) {
+          const cloudCats = cloudData.categories?.customCategories || [];
+          const cloudCatNames = new Set(cloudCats.map(c => (c.name || '').toLowerCase()));
+          const newLocalCats = localState.customCategories.filter(c => !cloudCatNames.has((c.name || '').toLowerCase()));
+          if (newLocalCats.length > 0 || !cloudData.categories) {
+            const merged = [...cloudCats, ...newLocalCats];
+            const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+            try {
+              await this.saveStoreCategories(merged, overrides);
+              pushedAny = true;
+            } catch(e) {}
           }
         }
 

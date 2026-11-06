@@ -164,6 +164,13 @@ class StudioState {
     }
     this.customCategories.push(newCat);
     this.save();
+
+    if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
+      try {
+        const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+        window.mayzaSupabase.saveStoreCategories(this.customCategories, overrides).catch(console.warn);
+      } catch(e) {}
+    }
     return newCat;
   }
 
@@ -174,6 +181,13 @@ class StudioState {
 
     this.customCategories = (this.customCategories || []).filter(c => c.name.toLowerCase() !== name.toLowerCase());
     this.save();
+
+    if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
+      try {
+        const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+        window.mayzaSupabase.saveStoreCategories(this.customCategories, overrides).catch(console.warn);
+      } catch(e) {}
+    }
     return true;
   }
 
@@ -221,6 +235,30 @@ class StudioState {
         if (Array.isArray(data.reviews)) {
           this.reviews = data.reviews;
           changed = true;
+        }
+        if (data.categories && Array.isArray(data.categories.customCategories)) {
+          const existingNames = new Set((this.customCategories || []).map(c => c.name.toLowerCase()));
+          data.categories.customCategories.forEach(cc => {
+            if (!existingNames.has(cc.name.toLowerCase())) {
+              this.customCategories.push(cc);
+              existingNames.add(cc.name.toLowerCase());
+              changed = true;
+            }
+          });
+        } else if (window.mayzaSupabase && window.mayzaSupabase.fetchStoreCategories) {
+          try {
+            const cloudCats = await window.mayzaSupabase.fetchStoreCategories();
+            if (cloudCats && Array.isArray(cloudCats.customCategories)) {
+              const existingNames = new Set((this.customCategories || []).map(c => c.name.toLowerCase()));
+              cloudCats.customCategories.forEach(cc => {
+                if (!existingNames.has(cc.name.toLowerCase())) {
+                  this.customCategories.push(cc);
+                  existingNames.add(cc.name.toLowerCase());
+                  changed = true;
+                }
+              });
+            }
+          } catch(e) {}
         }
         if (changed) {
           this.save();
@@ -1174,32 +1212,7 @@ function saveInlineCategory(isWholesale = false) {
     }
     renderCategorySelects(existing.name);
     renderCategoryFilterPills();
-    hideInlineCategoryCreator(isWholesale);
-    showToast(`Category "${existing.name}" is already available and selected! ✨`);
-    return;
-  }
 
-  const newCat = state.addCustomCategory(name, emoji, image, subtitle);
-  if (newCat) {
-    renderCategorySelects(newCat.name);
-    renderCategoryFilterPills();
-    hideInlineCategoryCreator(isWholesale);
-    showToast(`Added new category "${newCat.emoji} ${newCat.name}" with live store sync! 🌸`);
-    if (audio?.playSuccess) audio.playSuccess();
-  }
-}
-
-// =========================================================
-// MANAGE CATEGORIES MODAL (Edit Images & Details)
-// =========================================================
-let _editingCatName = null; // track which category is being edited
-
-function openManageCategoriesModal() {
-  const modal = document.getElementById("manageCategoriesModal");
-  if (!modal) return;
-  modal.classList.add("active");
-  renderManageCatGrid();
-  // hide edit panel
   const panel = document.getElementById("manageCatEditPanel");
   if (panel) panel.classList.add("hidden");
   _editingCatName = null;
@@ -1219,7 +1232,14 @@ function renderManageCatGrid() {
   const allCats = state.getAllCategories();
   const defaultNames = new Set(DEFAULT_CATEGORIES.map(c => c.name.toLowerCase()));
 
-  grid.innerHTML = allCats.map(cat => {
+  const newThumbHtml = `
+    <div class="manage-cat-thumb manage-cat-add-new-thumb ${_editingCatName === '__NEW__' ? 'selected' : ''}" id="manageCatAddNewThumb" title="Create a brand new category">
+      <div style="font-size:1.8rem; line-height:1; margin-bottom:4px;">＋</div>
+      <div class="manage-cat-thumb-label">New Category</div>
+    </div>
+  `;
+
+  grid.innerHTML = newThumbHtml + allCats.map(cat => {
     const isDefault = defaultNames.has(cat.name.toLowerCase());
     const img = cat.image || "assets/cat-return-gifts.jpg";
     const label = `${cat.emoji || ""} ${cat.name}`.trim();
@@ -1237,13 +1257,50 @@ function renderManageCatGrid() {
     `;
   }).join("");
 
+  document.getElementById("manageCatAddNewThumb")?.addEventListener("click", () => {
+    openCatCreatePanel();
+  });
+
   // Bind click on each thumb
-  grid.querySelectorAll(".manage-cat-thumb").forEach(thumb => {
+  grid.querySelectorAll(".manage-cat-thumb[data-cat-name]").forEach(thumb => {
     thumb.addEventListener("click", () => {
       const catName = thumb.dataset.catName;
       openCatEditPanel(catName);
     });
   });
+}
+
+function openCatCreatePanel() {
+  _editingCatName = '__NEW__';
+  document.querySelectorAll(".manage-cat-thumb").forEach(t => t.classList.remove("selected"));
+  document.getElementById("manageCatAddNewThumb")?.classList.add("selected");
+
+  const nameInput = document.getElementById("manageCatNameInput");
+  const subtitleInput = document.getElementById("manageCatSubtitleInput");
+  const emojiInput = document.getElementById("manageCatEmojiInput");
+  const imageUrlInput = document.getElementById("manageCatImageUrl");
+  const previewImg = document.getElementById("manageCatPreviewImg");
+  const previewName = document.getElementById("manageCatPreviewName");
+  const editNameLabel = document.getElementById("manageCatEditName");
+  const feedback = document.getElementById("manageCatFeedback");
+  const deleteBtn = document.getElementById("deleteCatBtn");
+
+  if (nameInput) { nameInput.value = ""; nameInput.disabled = false; }
+  if (subtitleInput) subtitleInput.value = "";
+  if (emojiInput) emojiInput.value = "✨";
+  if (imageUrlInput) imageUrlInput.value = "";
+  if (previewImg) previewImg.src = "assets/cat-return-gifts.jpg";
+  if (previewName) previewName.textContent = "✨ New Category";
+  if (editNameLabel) editNameLabel.textContent = "New Category (Create)";
+  if (feedback) { feedback.textContent = ""; feedback.classList.remove("visible"); }
+  if (deleteBtn) deleteBtn.style.display = "none";
+
+  const panel = document.getElementById("manageCatEditPanel");
+  if (panel) {
+    panel.classList.remove("hidden");
+    setTimeout(() => panel.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
+  }
+  nameInput?.focus();
 }
 
 function openCatEditPanel(catName) {
@@ -1258,6 +1315,9 @@ function openCatEditPanel(catName) {
     t.classList.toggle("selected", t.dataset.catName === catName);
   });
 
+  const defaultNames = new Set(DEFAULT_CATEGORIES.map(c => c.name.toLowerCase()));
+  const isDefault = defaultNames.has(catName.toLowerCase());
+
   // Populate fields
   const nameInput = document.getElementById("manageCatNameInput");
   const subtitleInput = document.getElementById("manageCatSubtitleInput");
@@ -1267,8 +1327,12 @@ function openCatEditPanel(catName) {
   const previewName = document.getElementById("manageCatPreviewName");
   const editNameLabel = document.getElementById("manageCatEditName");
   const feedback = document.getElementById("manageCatFeedback");
+  const deleteBtn = document.getElementById("deleteCatBtn");
 
-  if (nameInput) nameInput.value = cat.name;
+  if (nameInput) {
+    nameInput.value = cat.name;
+    nameInput.disabled = isDefault; // Default category names are protected
+  }
   if (subtitleInput) subtitleInput.value = cat.subtitle || "";
   if (emojiInput) emojiInput.value = cat.emoji || "✨";
   if (imageUrlInput) imageUrlInput.value = cat.image || "";
@@ -1277,8 +1341,11 @@ function openCatEditPanel(catName) {
     previewImg.onerror = function() { this.onerror = null; this.src = "assets/cat-return-gifts.jpg"; };
   }
   if (previewName) previewName.textContent = `${cat.emoji || ""} ${cat.name}`;
-  if (editNameLabel) editNameLabel.textContent = cat.name;
+  if (editNameLabel) editNameLabel.textContent = isDefault ? `${cat.name} (Default)` : cat.name;
   if (feedback) { feedback.textContent = ""; feedback.classList.remove("visible"); }
+  if (deleteBtn) {
+    deleteBtn.style.display = isDefault ? "none" : "inline-flex";
+  }
 
   // Show panel
   const panel = document.getElementById("manageCatEditPanel");
@@ -1290,6 +1357,29 @@ function openCatEditPanel(catName) {
   // File preview: reset file input
   const fileInput = document.getElementById("manageCatImageFile");
   if (fileInput) fileInput.value = "";
+}
+
+function handleDeleteCategory() {
+  if (!_editingCatName || _editingCatName === '__NEW__') return;
+  const isDefault = DEFAULT_CATEGORIES.some(c => c.name.toLowerCase() === _editingCatName.toLowerCase());
+  if (isDefault) {
+    showToast("Default categories cannot be deleted! 🛡️", "warning");
+    return;
+  }
+  if (!confirm(`Are you sure you want to delete category "${_editingCatName}"?`)) return;
+
+  const catToDelete = _editingCatName;
+  const success = state.deleteCustomCategory(catToDelete);
+  if (success) {
+    showToast(`Deleted category "${catToDelete}" and synced with live store! 🗑️`);
+    _editingCatName = null;
+    const panel = document.getElementById("manageCatEditPanel");
+    if (panel) panel.classList.add("hidden");
+    renderManageCatGrid();
+    renderCategorySelects();
+    renderCategoryFilterPills();
+    audio.playClick?.();
+  }
 }
 
 function saveCategoryImageChanges() {
@@ -1309,6 +1399,21 @@ function saveCategoryImageChanges() {
   if (!newName) {
     if (feedback) { feedback.textContent = "Category name cannot be empty!"; feedback.classList.add("visible"); }
     nameInput?.focus();
+    return;
+  }
+
+  // If creating brand new category
+  if (_editingCatName === '__NEW__') {
+    const created = state.addCustomCategory(newName, newEmoji, newImage, newSubtitle);
+    if (created) {
+      _editingCatName = created.name;
+      renderManageCatGrid();
+      renderCategorySelects(created.name);
+      renderCategoryFilterPills();
+      showToast(`Added new category "${created.emoji} ${created.name}" with live cloud sync! 🌸`);
+      if (feedback) { feedback.textContent = ""; feedback.classList.remove("visible"); }
+      audio.playSuccess?.();
+    }
     return;
   }
 
@@ -1340,6 +1445,11 @@ function saveCategoryImageChanges() {
       if (newEmoji) defCat.emoji = newEmoji;
     }
 
+    // Push overrides to Supabase cloud
+    if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
+      window.mayzaSupabase.saveStoreCategories(state.customCategories, overrides).catch(console.warn);
+    }
+
     showToast(`Updated picture & details for "${_editingCatName}"! 🌸 Syncing to live store...`);
   } else {
     // Custom category — update directly in state
@@ -1354,6 +1464,13 @@ function saveCategoryImageChanges() {
       }
     }
     state.save();
+
+    // Push to Supabase cloud
+    if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
+      const overrides = JSON.parse(localStorage.getItem("mm_category_overrides") || "{}");
+      window.mayzaSupabase.saveStoreCategories(state.customCategories, overrides).catch(console.warn);
+    }
+
     renderCategorySelects();
     renderCategoryFilterPills();
     showToast(`Category "${newName}" updated! 🖼️ Live store refreshed!`);
@@ -3080,11 +3197,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Manage Categories Modal ---
   document.getElementById("manageCategoriesBtn")?.addEventListener("click", () => openManageCategoriesModal());
+  document.getElementById("manageModalAddNewCatBtn")?.addEventListener("click", () => openCatCreatePanel());
   document.getElementById("closeManageCategoriesBtn")?.addEventListener("click", () => closeManageCategoriesModal());
   document.getElementById("manageCategoriesModal")?.addEventListener("click", (e) => {
     if (e.target === document.getElementById("manageCategoriesModal")) closeManageCategoriesModal();
   });
   document.getElementById("saveCatChangesBtn")?.addEventListener("click", () => saveCategoryImageChanges());
+  document.getElementById("deleteCatBtn")?.addEventListener("click", () => handleDeleteCategory());
   document.getElementById("cancelCatChangesBtn")?.addEventListener("click", () => {
     const panel = document.getElementById("manageCatEditPanel");
     if (panel) panel.classList.add("hidden");
@@ -3096,6 +3215,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (panel) panel.classList.add("hidden");
     _editingCatName = null;
     document.querySelectorAll(".manage-cat-thumb").forEach(t => t.classList.remove("selected"));
+  });
+
+  // Listen for realtime categories updates from Supabase cloud
+  window.addEventListener('mayza:cloud-categories-changed', () => {
+    console.log('[Admin Realtime] Cloud categories changed event received');
+    if (window.mayzaSupabase && window.mayzaSupabase.fetchStoreCategories) {
+      window.mayzaSupabase.fetchStoreCategories().then(cloudCats => {
+        if (cloudCats && Array.isArray(cloudCats.customCategories)) {
+          state.customCategories = cloudCats.customCategories;
+          renderCategorySelects();
+          renderCategoryFilterPills();
+          renderManageCatGrid();
+        }
+      });
+    }
   });
   document.getElementById("manageCatImageUrl")?.addEventListener("input", () => {
     const url = document.getElementById("manageCatImageUrl")?.value?.trim();
@@ -3425,7 +3559,7 @@ function initSupabaseManager() {
 
     try {
       const res = await window.mayzaSupabase.syncLocalToSupabase(state);
-      showToast(`Cloud Sync Complete! Uploaded ${res.products} products, ${res.orders} orders, ${res.wholesale} wholesale bills! 🚀`);
+      showToast(`Cloud Sync Complete! Uploaded ${res.products} products, ${res.categories || 0} categories, ${res.orders} orders! 🚀`);
       triggerCelebration();
       audio?.playSuccess();
     } catch (err) {
@@ -3448,18 +3582,17 @@ function initSupabaseManager() {
 
     try {
       const pulled = await state.initCloudSync();
-      if (pulled) {
-        renderDashboardOverview();
-        renderOrdersTable();
-        renderProductMatrix();
-        renderCoupons();
-        renderWholesalePurchases();
-        showToast("Successfully synced all catalog and orders from Supabase! 🌸");
-        triggerCelebration();
-        audio?.playSuccess();
-      } else {
-        showToast("Cloud sync check completed. Local catalog is already up-to-date!");
-      }
+      renderDashboardOverview();
+      renderOrdersTable();
+      renderProductMatrix();
+      renderCoupons();
+      renderWholesalePurchases();
+      renderCategorySelects();
+      renderCategoryFilterPills();
+      renderManageCatGrid();
+      showToast("Pulled and synced all products, categories & store data from Supabase! 🌸");
+      triggerCelebration();
+      audio?.playSuccess();
     } catch (err) {
       showToast(`Pull error: ${err.message}`, "warning");
     } finally {
