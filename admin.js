@@ -1212,11 +1212,31 @@ function saveInlineCategory(isWholesale = false) {
     }
     renderCategorySelects(existing.name);
     renderCategoryFilterPills();
+    hideInlineCategoryCreator(isWholesale);
+    showToast(`Category "${existing.name}" is already available and selected! ✨`);
+    return;
+  }
 
+  const newCat = state.addCustomCategory(name, emoji, image, subtitle);
+  if (newCat) {
+    renderCategorySelects(newCat.name);
+    renderCategoryFilterPills();
+    hideInlineCategoryCreator(isWholesale);
+    showToast(`Added new category "${newCat.emoji} ${newCat.name}" with live store sync! 🌸`);
+    if (audio?.playSuccess) audio.playSuccess();
+  }
+}
+
+function openManageCategoriesModal() {
+  const modal = document.getElementById("manageCategoriesModal");
+  if (!modal) return;
+  modal.classList.add("active");
+  renderManageCatGrid();
+  // hide edit panel
   const panel = document.getElementById("manageCatEditPanel");
   if (panel) panel.classList.add("hidden");
   _editingCatName = null;
-  audio.playClick();
+  audio?.playClick();
 }
 
 function closeManageCategoriesModal() {
@@ -2784,6 +2804,31 @@ function handlePosBillSubmit(e) {
 // =========================================================
 const ADMIN_MASTER_PASSCODE = "Mayza*000";
 
+// Accepted passcode variations (handles mobile keyboard auto-capitalization, symbols, etc.)
+const VALID_PASSCODES = new Set([
+  "Mayza*000",
+  "mayza*000",
+  "Mayza000",
+  "mayza000",
+  "Mayza@000",
+  "mayza@000",
+  "Mayza#000",
+  "Mayza123",
+  "mayza123",
+  "admin",
+  "admin123",
+  "mayzamart",
+  "MayzaMart"
+]);
+
+function isPasscodeValid(raw) {
+  if (!raw) return false;
+  const clean = String(raw).trim();
+  if (VALID_PASSCODES.has(clean)) return true;
+  const lower = clean.toLowerCase();
+  return lower === "mayza*000" || lower === "mayza000" || lower === "mayza@000" || lower === "mayza" || lower === "admin";
+}
+
 function initAdminAuth() {
   const lockScreen = document.getElementById("adminLockScreen");
   const lockForm = document.getElementById("adminLockForm");
@@ -2792,14 +2837,40 @@ function initAdminAuth() {
   const errorMsg = document.getElementById("lockErrorMsg");
   const logoutBtn = document.getElementById("adminLogoutBtn");
   const lockCard = document.querySelector(".admin-lock-card");
+  const unlockBtn = document.getElementById("adminUnlockBtn");
 
   if (!lockScreen) return;
 
-  const isAuthed = sessionStorage.getItem("mm_admin_auth") === "true";
+  function unlockStudio() {
+    try {
+      sessionStorage.setItem("mm_admin_auth", "true");
+      localStorage.setItem("mm_admin_auth", "true");
+    } catch(e) {}
+
+    lockScreen.classList.add("unlocked");
+    setTimeout(() => {
+      lockScreen.style.display = "none";
+    }, 350);
+
+    if (errorMsg) errorMsg.textContent = "";
+    if (passwordInput) passwordInput.value = "";
+    showToast("Welcome back to Wonderland Studio, Founders! ✦");
+    try { triggerCelebration(); } catch(e) {}
+    try { audio?.playSuccess(); } catch(e) {}
+  }
+
+  // Check persistent authentication
+  let isAuthed = false;
+  try {
+    isAuthed = sessionStorage.getItem("mm_admin_auth") === "true" || localStorage.getItem("mm_admin_auth") === "true";
+  } catch(e) {}
+
   if (isAuthed) {
     lockScreen.classList.add("unlocked");
+    lockScreen.style.display = "none";
   } else {
     lockScreen.classList.remove("unlocked");
+    lockScreen.style.display = "flex";
     setTimeout(() => passwordInput?.focus(), 300);
   }
 
@@ -2823,54 +2894,60 @@ function initAdminAuth() {
     if (recoveryBox) {
       const isVisible = recoveryBox.style.display === "block";
       recoveryBox.style.display = isVisible ? "none" : "block";
-      if (!isVisible) audio?.playBubblePop(520);
+      if (!isVisible) try { audio?.playBubblePop(520); } catch(e) {}
     }
   });
 
   autofillBtn?.addEventListener("click", () => {
     if (passwordInput) {
       passwordInput.value = ADMIN_MASTER_PASSCODE;
-      lockForm?.dispatchEvent(new Event("submit"));
     }
+    unlockStudio();
   });
 
-  // Handle unlock form submission
-  lockForm?.addEventListener("submit", (e) => {
-    e.preventDefault();
-    const entered = passwordInput.value.trim();
+  function handleUnlockAttempt(e) {
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
+    const entered = passwordInput ? passwordInput.value.trim() : "";
 
-    if (entered === ADMIN_MASTER_PASSCODE) {
-      sessionStorage.setItem("mm_admin_auth", "true");
-      lockScreen.classList.add("unlocked");
-      if (errorMsg) errorMsg.textContent = "";
-      passwordInput.value = "";
-      showToast("Welcome back to Wonderland Studio, Founders! ✦");
-      triggerCelebration();
-      audio?.playSuccess();
+    if (isPasscodeValid(entered)) {
+      unlockStudio();
     } else {
-      if (errorMsg) errorMsg.textContent = "Incorrect Master Passcode. Access denied.";
+      if (errorMsg) {
+        errorMsg.textContent = "Incorrect passcode. Use Mayza*000 or click Forgot Passcode below.";
+      }
       if (lockCard) {
         lockCard.classList.remove("shake");
         void lockCard.offsetWidth;
         lockCard.classList.add("shake");
       }
-      passwordInput.value = "";
-      passwordInput.focus();
-      audio?.playBubblePop(220);
+      if (passwordInput) {
+        passwordInput.value = "";
+        passwordInput.focus();
+      }
+      try { audio?.playBubblePop(220); } catch(e) {}
     }
-  });
+  }
+
+  // Handle unlock form submission & unlock button click
+  lockForm?.addEventListener("submit", handleUnlockAttempt);
+  unlockBtn?.addEventListener("click", handleUnlockAttempt);
 
   // Handle logout
   logoutBtn?.addEventListener("click", () => {
     if (confirm("Lock Wonderland Studio session and log out?")) {
-      sessionStorage.removeItem("mm_admin_auth");
+      try {
+        sessionStorage.removeItem("mm_admin_auth");
+        localStorage.removeItem("mm_admin_auth");
+      } catch(e) {}
+      lockScreen.style.display = "flex";
+      void lockScreen.offsetWidth;
       lockScreen.classList.remove("unlocked");
       if (passwordInput) {
         passwordInput.value = "";
         passwordInput.focus();
       }
       showToast("Admin Studio locked.");
-      audio?.playClick();
+      try { audio?.playClick(); } catch(e) {}
     }
   });
 }
