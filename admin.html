@@ -299,15 +299,15 @@
               <div class="kpi-glow"></div>
               <div class="kpi-header">
                 <div class="kpi-icon-box">💰</div>
-                <span class="kpi-badge positive">+18.4% ↑</span>
+                <span class="kpi-badge positive" id="kpiRevBadge">Live Sales</span>
               </div>
               <div class="kpi-body">
-                <span class="kpi-label">Today's Revenue</span>
+                <span class="kpi-label">Total Revenue</span>
                 <div class="kpi-value-row">
                   <span class="kpi-currency">₹</span>
-                  <span class="kpi-value" id="kpiRevenue">48,920</span>
+                  <span class="kpi-value" id="kpiRevenue">0</span>
                 </div>
-                <span class="kpi-comparison">vs ₹41,310 yesterday</span>
+                <span class="kpi-comparison" id="kpiRevSub">Online Orders + In-Store POS</span>
               </div>
               <!-- Mini SVG Sparkline -->
               <svg class="kpi-sparkline" viewBox="0 0 100 24" preserveAspectRatio="none">
@@ -320,15 +320,15 @@
               <div class="kpi-glow"></div>
               <div class="kpi-header">
                 <div class="kpi-icon-box">📦</div>
-                <span class="kpi-badge positive">+12.5% ↑</span>
+                <span class="kpi-badge positive" id="kpiOrdBadge">Active</span>
               </div>
               <div class="kpi-body">
-                <span class="kpi-label">Active Orders</span>
+                <span class="kpi-label">Total Orders</span>
                 <div class="kpi-value-row">
-                  <span class="kpi-value" id="kpiOrders">34</span>
+                  <span class="kpi-value" id="kpiOrders">0</span>
                   <span class="kpi-unit">orders</span>
                 </div>
-                <span class="kpi-comparison">8 pending packaging</span>
+                <span class="kpi-comparison" id="kpiOrdSub">All customer purchases</span>
               </div>
               <svg class="kpi-sparkline" viewBox="0 0 100 24" preserveAspectRatio="none">
                 <path d="M0,16 Q20,10 40,16 T70,8 T100,5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
@@ -340,35 +340,35 @@
               <div class="kpi-glow"></div>
               <div class="kpi-header">
                 <div class="kpi-icon-box">🏷️</div>
-                <span class="kpi-badge positive">+5.2% ↑</span>
+                <span class="kpi-badge positive" id="kpiAovBadge">AOV</span>
               </div>
               <div class="kpi-body">
                 <span class="kpi-label">Average Basket (AOV)</span>
                 <div class="kpi-value-row">
                   <span class="kpi-currency">₹</span>
-                  <span class="kpi-value" id="kpiAov">645</span>
+                  <span class="kpi-value" id="kpiAov">0</span>
                 </div>
-                <span class="kpi-comparison">Avg items per cart: 2.8</span>
+                <span class="kpi-comparison" id="kpiAovSub">Average spend per purchase</span>
               </div>
               <svg class="kpi-sparkline" viewBox="0 0 100 24" preserveAspectRatio="none">
                 <path d="M0,14 Q25,20 50,11 T75,12 T100,6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
               </svg>
             </div>
 
-            <!-- KPI 4: Storefront Visitors -->
+            <!-- KPI 4: Store Customers -->
             <div class="kpi-card kpi-mint">
               <div class="kpi-glow"></div>
               <div class="kpi-header">
-                <div class="kpi-icon-box">✨</div>
-                <span class="kpi-badge positive">+24.8% ↑</span>
+                <div class="kpi-icon-box">👥</div>
+                <span class="kpi-badge positive">Customers</span>
               </div>
               <div class="kpi-body">
-                <span class="kpi-label">Store Visitors</span>
+                <span class="kpi-label">Purchasing Members</span>
                 <div class="kpi-value-row">
-                  <span class="kpi-value" id="kpiVisitors">1,842</span>
-                  <span class="kpi-unit">live</span>
+                  <span class="kpi-value" id="kpiVisitors">0</span>
+                  <span class="kpi-unit">members</span>
                 </div>
-                <span class="kpi-comparison">Conversion rate: 4.1%</span>
+                <span class="kpi-comparison" id="kpiVisitorsSub">Customers who ordered</span>
               </div>
               <svg class="kpi-sparkline" viewBox="0 0 100 24" preserveAspectRatio="none">
                 <path d="M0,20 Q20,15 40,8 T70,12 T100,3" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
@@ -1368,6 +1368,99 @@
           <p class="note-sign">— Warm hugs from Mauji, Aynul &amp; Faiza 🌸✨</p>
         </div>
       </div>
+    </div>
+  </div>
+
+
+  <!-- ============================================ -->
+  <!-- MODAL: EDIT ORDER & DISPATCH DETAILS         -->
+  <!-- ============================================ -->
+  <div class="studio-modal-overlay" id="editOrderModal" aria-hidden="true">
+    <div class="studio-modal glass-card" style="max-width: 660px; width: 95vw;">
+      <div class="modal-header">
+        <div class="modal-title-lockup">
+          <span class="modal-badge-sparkle">✏️</span>
+          <h3 class="modal-title">Edit Order &amp; Dispatch Details</h3>
+        </div>
+        <button class="modal-close-btn" id="closeEditOrderModalBtn">&times;</button>
+      </div>
+      <form id="editOrderForm" class="modal-body" style="padding: 0 24px 24px;">
+        <input type="hidden" id="editOrderId">
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">Order ID</label>
+            <input type="text" id="editOrderIdDisplay" class="studio-input" disabled style="opacity: 0.75; font-weight: 700; font-family: monospace;">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">Order Status</label>
+            <select id="editOrderStatus" class="studio-input" style="font-weight: 600;">
+              <option value="New">New</option>
+              <option value="Packed">Packed</option>
+              <option value="Dispatched">Dispatched</option>
+              <option value="Delivered">Delivered</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">Customer Name *</label>
+            <input type="text" id="editOrderCustName" class="studio-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">Customer Phone</label>
+            <input type="text" id="editOrderCustPhone" class="studio-input" placeholder="+91...">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">Delivery Address / Notes</label>
+          <textarea id="editOrderCustAddress" class="studio-input" rows="2" placeholder="Street, Area, Landmark..."></textarea>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">City / Destination</label>
+            <input type="text" id="editOrderCustCity" class="studio-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">Pincode</label>
+            <input type="text" id="editOrderCustPin" class="studio-input" placeholder="000000">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">Payment Mode</label>
+            <input type="text" id="editOrderPayment" class="studio-input" placeholder="Cash on Delivery, UPI, etc.">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">Total Amount (₹) *</label>
+            <input type="number" id="editOrderTotal" class="studio-input" step="1" required style="font-weight: 700; color: var(--color-rose);">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 5px;">Tracking Number / Dispatch Courier</label>
+          <input type="text" id="editOrderTracking" class="studio-input" placeholder="e.g. DEL-98765432 / BlueDart / Local Delivery">
+        </div>
+
+        <div style="background: rgba(136,14,79,0.04); border: 1px solid rgba(136,14,79,0.1); border-radius: 12px; padding: 12px; margin-bottom: 18px;">
+          <label class="form-label" style="font-size: 0.8rem; font-weight: 700; color: var(--primary); display: block; margin-bottom: 8px;">📦 Order Items Summary</label>
+          <div id="editOrderItemsList" style="max-height: 140px; overflow-y: auto; font-size: 0.82rem;">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px; padding: 0;">
+          <button type="button" class="action-btn secondary-btn" id="cancelEditOrderBtn">Cancel</button>
+          <button type="submit" class="action-btn primary-glow-btn">
+            <span>💾 Save Order Changes</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 

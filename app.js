@@ -1022,6 +1022,11 @@ class MayzaEntranceApp {
       isCustom: true
     }));
 
+    let deletedCats = new Set();
+    try {
+      deletedCats = new Set(JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]').map(c => String(c).toLowerCase().trim()));
+    } catch(e) {}
+
     const defaultNames = new Set(defaultCategories.map(d => d.name.toLowerCase().trim()));
 
     // Apply any admin overrides to default categories (from Manage Categories modal)
@@ -1087,6 +1092,9 @@ class MayzaEntranceApp {
       // No cloud products yet — show defaults + custom
       allCategories = [...defaultCategories, ...uniqueCustom];
     }
+
+    // Filter out any explicitly deleted categories
+    allCategories = allCategories.filter(c => !deletedCats.has((c.name || '').toLowerCase().trim()));
 
     const knownNames = new Set(allCategories.map(c => (c.name || '').toLowerCase().trim()));
 
@@ -1163,7 +1171,7 @@ class MayzaEntranceApp {
         this.syncLiveCategories();
       });
       window.addEventListener('storage', (e) => {
-        if (e.key === 'mm_custom_categories' || e.key === 'mm_categories_timestamp' || e.key === 'mm_category_overrides' || e.key === 'mm_products') {
+        if (e.key === 'mm_custom_categories' || e.key === 'mm_categories_timestamp' || e.key === 'mm_category_overrides' || e.key === 'mm_products' || e.key === 'mm_deleted_categories') {
           this.syncLiveCategories();
         }
       });

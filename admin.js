@@ -97,7 +97,15 @@ class StudioState {
   }
 
   getAllCategories() {
-    const defaults = DEFAULT_CATEGORIES.map(c => ({ ...c }));
+    let deletedCats = new Set();
+    try {
+      deletedCats = new Set(JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]').map(c => String(c).toLowerCase().trim()));
+    } catch(e) {}
+
+    const defaults = DEFAULT_CATEGORIES
+      .filter(c => !deletedCats.has(c.name.toLowerCase().trim()))
+      .map(c => ({ ...c }));
+
     try {
       const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
       defaults.forEach(cat => {
@@ -109,7 +117,8 @@ class StudioState {
         }
       });
     } catch(e) {}
-    const custom = Array.isArray(this.customCategories) ? this.customCategories : [];
+    const custom = (Array.isArray(this.customCategories) ? this.customCategories : [])
+      .filter(c => !deletedCats.has((c.name || '').toLowerCase().trim()));
     
     const existingNames = new Set([
       ...defaults.map(c => c.name.toLowerCase()),
@@ -119,12 +128,13 @@ class StudioState {
     const extraFromProducts = [];
     if (Array.isArray(this.products)) {
       this.products.forEach(p => {
-        if (p.category && !existingNames.has(p.category.toLowerCase())) {
-          existingNames.add(p.category.toLowerCase());
+        const pCat = (p.category || '').trim();
+        if (pCat && !deletedCats.has(pCat.toLowerCase()) && !existingNames.has(pCat.toLowerCase())) {
+          existingNames.add(pCat.toLowerCase());
           extraFromProducts.push({
-            name: p.category,
+            name: pCat,
             emoji: "🏷️",
-            image: "assets/cat-return-gifts.jpg",
+            image: p.image || "assets/cat-return-gifts.jpg",
             subtitle: "Explore collection",
             isCustom: true
           });
@@ -174,21 +184,38 @@ class StudioState {
     return newCat;
   }
 
-  deleteCustomCategory(name) {
+  deleteCategory(name) {
     if (!name) return false;
-    const isDefault = DEFAULT_CATEGORIES.some(c => c.name.toLowerCase() === name.toLowerCase());
-    if (isDefault) return false; // Default categories can NEVER be deleted
+    const clean = name.trim();
+    const cleanLower = clean.toLowerCase();
 
-    this.customCategories = (this.customCategories || []).filter(c => c.name.toLowerCase() !== name.toLowerCase());
+    // 1. Record in deleted categories so it never returns from defaults or products
+    try {
+      const deletedCats = JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]');
+      if (!deletedCats.some(c => String(c).toLowerCase() === cleanLower)) {
+        deletedCats.push(clean);
+        localStorage.setItem('mm_deleted_categories', JSON.stringify(deletedCats));
+      }
+    } catch(e) {}
+
+    // 2. Remove from customCategories list
+    this.customCategories = (this.customCategories || []).filter(c => (c.name || '').toLowerCase().trim() !== cleanLower);
     this.save();
 
+    // 3. Sync to Supabase cloud
     if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
       try {
         const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+        const deletedCats = JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]');
+        overrides.__deleted_categories__ = deletedCats;
         window.mayzaSupabase.saveStoreCategories(this.customCategories, overrides).catch(console.warn);
       } catch(e) {}
     }
     return true;
+  }
+
+  deleteCustomCategory(name) {
+    return this.deleteCategory(name);
   }
 
   async initCloudSync() {
@@ -405,38 +432,10 @@ function triggerCelebration() {
 // =========================================================
 // 5. INTERACTIVE CHART & ANALYTICS ENGINE
 // =========================================================
-const CHART_DATA_PRESETS = {
-  today: {
-    times: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:59"],
-    revenue: [1200, 800, 4500, 11400, 18900, 36400, 48920],
-    orders: [1, 1, 4, 8, 14, 27, 34],
-    peak: "06:00 PM – 09:30 PM (₹19,450)"
-  },
-  week: {
-    times: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    revenue: [32400, 38900, 42100, 45600, 58200, 64500, 48920],
-    orders: [24, 28, 31, 35, 46, 52, 34],
-    peak: "Saturday Night Rush (₹64,500)"
-  },
-  month: {
-    times: ["Week 1", "Week 2", "Week 3", "Week 4"],
-    revenue: [112000, 145000, 168000, 194000],
-    orders: [85, 110, 134, 158],
-    peak: "Festive Weekend Week 4"
-  },
-  year: {
-    times: ["Q1", "Q2", "Q3", "Q4"],
-    revenue: [450000, 680000, 890000, 1240000],
-    orders: [350, 520, 710, 990],
-    peak: "Q4 Gifting Season"
-  }
-};
-
 let currentChartTimeframe = "today";
 
 function renderSalesChart(timeframe = "today") {
   currentChartTimeframe = timeframe;
-  const data = CHART_DATA_PRESETS[timeframe] || CHART_DATA_PRESETS.today;
   const svg = document.getElementById("salesSvgChart");
   const areaPath = document.getElementById("chartAreaPath");
   const strokePath = document.getElementById("chartStrokePath");
@@ -444,6 +443,44 @@ function renderSalesChart(timeframe = "today") {
   const xLabels = document.getElementById("chartXLabels");
 
   if (!svg || !areaPath || !strokePath) return;
+
+  const validOrders = (state.orders || []).filter(o => o && !isNaN(Number(o.total)));
+  const totalRev = validOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+
+  // Time slots for chart
+  const times = timeframe === "week"
+    ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    : timeframe === "month"
+    ? ["Wk 1", "Wk 2", "Wk 3", "Wk 4"]
+    : timeframe === "year"
+    ? ["Q1", "Q2", "Q3", "Q4"]
+    : ["09:00", "12:00", "15:00", "18:00", "21:00", "Now"];
+
+  // Calculate real revenue distribution
+  const count = times.length;
+  let revPoints = [];
+  let ordPoints = [];
+
+  if (validOrders.length === 0 || totalRev === 0) {
+    revPoints = new Array(count).fill(0);
+    ordPoints = new Array(count).fill(0);
+  } else {
+    // Distribute real revenue progressively up to totalRev
+    revPoints = times.map((t, idx) => {
+      const ratio = (idx + 1) / count;
+      return Math.round(totalRev * ratio);
+    });
+    ordPoints = times.map((t, idx) => {
+      return Math.min(validOrders.length, Math.round(validOrders.length * ((idx + 1) / count)));
+    });
+  }
+
+  const data = {
+    times: times,
+    revenue: revPoints,
+    orders: ordPoints,
+    peak: validOrders.length > 0 ? `${validOrders.length} Real Orders (₹${totalRev.toLocaleString("en-IN")})` : "No purchases yet"
+  };
 
   // Update X-axis labels
   if (xLabels) {
@@ -457,12 +494,12 @@ function renderSalesChart(timeframe = "today") {
   const padTop = 40;
   const padBottom = 260;
 
-  const maxVal = Math.max(...data.revenue) * 1.15;
+  const maxVal = Math.max(...data.revenue, 100) * 1.15;
   const minVal = 0;
 
   // Calculate coordinates
   const coords = data.revenue.map((val, i) => {
-    const x = padLeft + (i / (data.revenue.length - 1)) * (padRight - padLeft);
+    const x = padLeft + (i / Math.max(1, data.revenue.length - 1)) * (padRight - padLeft);
     const y = padBottom - ((val - minVal) / (maxVal - minVal)) * (padBottom - padTop);
     return { x, y, rev: val, order: data.orders[i], time: data.times[i] };
   });
@@ -591,18 +628,39 @@ function switchView(viewName) {
 // 7. DASHBOARD OVERVIEW RENDERING
 // =========================================================
 function renderDashboardOverview() {
-  // Update KPI counters
-  const totalRev = state.orders.reduce((sum, o) => sum + o.total, 48920);
-  const activeOrders = state.orders.length;
-  const aov = Math.round(totalRev / activeOrders);
+  // Update KPI counters purely from REAL purchases (Online storefront + In-Store POS)
+  const validOrders = (state.orders || []).filter(o => o && !isNaN(Number(o.total)));
+  const totalRev = validOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const activeOrders = validOrders.length;
+  const aov = activeOrders > 0 ? Math.round(totalRev / activeOrders) : 0;
+
+  // Calculate unique purchasing members
+  const uniqueCustomers = new Set(
+    validOrders.map(o => (o.customer?.name || o.customer?.phone || '').trim().toLowerCase()).filter(Boolean)
+  ).size;
 
   const kpiRev = document.getElementById("kpiRevenue");
   const kpiOrd = document.getElementById("kpiOrders");
   const kpiAov = document.getElementById("kpiAov");
+  const kpiVisitors = document.getElementById("kpiVisitors");
 
   if (kpiRev) kpiRev.textContent = totalRev.toLocaleString("en-IN");
   if (kpiOrd) kpiOrd.textContent = activeOrders;
-  if (kpiAov) kpiAov.textContent = aov;
+  if (kpiAov) kpiAov.textContent = aov.toLocaleString("en-IN");
+  if (kpiVisitors) kpiVisitors.textContent = uniqueCustomers || 0;
+
+  const kpiRevSub = document.getElementById("kpiRevSub");
+  const kpiOrdSub = document.getElementById("kpiOrdSub");
+  const kpiAovSub = document.getElementById("kpiAovSub");
+  const kpiVisitorsSub = document.getElementById("kpiVisitorsSub");
+
+  const pendingCount = validOrders.filter(o => o.status === "New" || o.status === "Packed").length;
+  const deliveredCount = validOrders.filter(o => o.status === "Delivered").length;
+
+  if (kpiRevSub) kpiRevSub.textContent = activeOrders > 0 ? `${activeOrders} customer purchase${activeOrders === 1 ? '' : 's'}` : "Online & In-Store POS sales";
+  if (kpiOrdSub) kpiOrdSub.textContent = pendingCount > 0 ? `${pendingCount} in packaging/dispatch` : `${deliveredCount} fulfilled`;
+  if (kpiAovSub) kpiAovSub.textContent = activeOrders > 0 ? `Avg spend: ₹${aov}` : "Average order amount";
+  if (kpiVisitorsSub) kpiVisitorsSub.textContent = uniqueCustomers > 0 ? `${uniqueCustomers} customer${uniqueCustomers === 1 ? '' : 's'} purchased` : "Purchasing members";
 
   // Sidebar count badges
   const navOrderBadge = document.getElementById("ordersNavCount");
@@ -743,6 +801,9 @@ function renderOrdersTable() {
                 ${nextLabel}
               </button>
             ` : ""}
+            <button class="row-btn edit-order-btn" onclick="openEditOrderModal('${o.id}')" title="Edit Order Details">
+              ✏️ Edit
+            </button>
             <a href="${waUrl}" target="_blank" class="row-btn wa-btn" title="Ping Customer on WhatsApp">
               💬 WhatsApp
             </a>
@@ -799,6 +860,60 @@ async function deleteOrder(orderId) {
       }
     }
   }
+}
+
+function openEditOrderModal(orderId) {
+  const order = state.orders.find(o => String(o.id) === String(orderId));
+  if (!order) return;
+
+  const modal = document.getElementById("editOrderModal");
+  if (!modal) return;
+
+  const idInput = document.getElementById("editOrderId");
+  const idDisplay = document.getElementById("editOrderIdDisplay");
+  const statusSelect = document.getElementById("editOrderStatus");
+  const nameInput = document.getElementById("editOrderCustName");
+  const phoneInput = document.getElementById("editOrderCustPhone");
+  const addressInput = document.getElementById("editOrderCustAddress");
+  const cityInput = document.getElementById("editOrderCustCity");
+  const pinInput = document.getElementById("editOrderCustPin");
+  const paymentInput = document.getElementById("editOrderPayment");
+  const totalInput = document.getElementById("editOrderTotal");
+  const trackingInput = document.getElementById("editOrderTracking");
+  const itemsContainer = document.getElementById("editOrderItemsList");
+
+  if (idInput) idInput.value = order.id;
+  if (idDisplay) idDisplay.value = order.id;
+  if (statusSelect) statusSelect.value = order.status || "New";
+  if (nameInput) nameInput.value = order.customer?.name || "";
+  if (phoneInput) phoneInput.value = order.customer?.phone || "";
+  if (addressInput) addressInput.value = order.customer?.address || "";
+  if (cityInput) cityInput.value = order.customer?.city || "";
+  if (pinInput) pinInput.value = order.customer?.pin || "";
+  if (paymentInput) paymentInput.value = order.payment || "Prepaid UPI";
+  if (totalInput) totalInput.value = order.total || 0;
+  if (trackingInput) trackingInput.value = order.tracking || "";
+
+  if (itemsContainer) {
+    if (Array.isArray(order.items) && order.items.length > 0) {
+      itemsContainer.innerHTML = order.items.map(item => `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(136,14,79,0.08);">
+          <span style="font-weight:600; color:var(--text-dark);">${escapeHtml(item.name || 'Item')}</span>
+          <span style="color:var(--primary); font-weight:700;">₹${item.price || 0} × ${item.qty || 1}</span>
+        </div>
+      `).join("");
+    } else {
+      itemsContainer.innerHTML = `<p style="margin:0; color:var(--text-muted); font-size:0.8rem;">No item details recorded.</p>`;
+    }
+  }
+
+  modal.classList.add("active");
+  try { audio?.playClick?.(); } catch (e) {}
+}
+
+function closeEditOrderModal() {
+  const modal = document.getElementById("editOrderModal");
+  if (modal) modal.classList.remove("active");
 }
 
 function getNextStatus(current) {
@@ -1096,7 +1211,7 @@ function renderCategoryFilterPills() {
   allCats.forEach(c => {
     const isActive = current === c.name ? "active" : "";
     const label = `${c.emoji ? c.emoji + " " : ""}${c.shortName || c.name}`;
-    const deleteBtn = c.isCustom ? `<span class="pill-del-btn" title="Remove custom category (Defaults are protected)" data-del-cat="${c.name}">&times;</span>` : "";
+    const deleteBtn = `<span class="pill-del-btn" title="Remove category ${c.name}" data-del-cat="${c.name}">&times;</span>`;
     html += `<button class="cat-filter-pill ${isActive}" data-category="${c.name}">${label}${deleteBtn}</button>`;
   });
 
@@ -1280,6 +1395,7 @@ function renderManageCatGrid() {
     return `
       <div class="manage-cat-thumb ${selectedClass}" data-cat-name="${cat.name}" title="Click to edit ${cat.name}">
         ${defaultBadge}
+        <button type="button" class="manage-cat-thumb-del-btn" data-del-cat="${cat.name}" title="Delete category ${cat.name}">🗑️</button>
         <img src="${cat.image || 'assets/cat-return-gifts.jpg'}" alt="${cat.name}"
              onerror="this.onerror=null; this.src='assets/cat-return-gifts.jpg';">
         <div class="manage-cat-thumb-label">${label}</div>
@@ -1291,6 +1407,26 @@ function renderManageCatGrid() {
 
   document.getElementById("manageCatAddNewThumb")?.addEventListener("click", () => {
     openCatCreatePanel();
+  });
+
+  // Bind click on delete button of each thumb
+  grid.querySelectorAll(".manage-cat-thumb-del-btn").forEach(delBtn => {
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const catName = delBtn.dataset.delCat;
+      if (!catName) return;
+      if (confirm(`Are you sure you want to delete category "${catName}"? Products in this category will keep their items but won't have this category tag.`)) {
+        state.deleteCategory(catName);
+        _editingCatName = null;
+        const panel = document.getElementById("manageCatEditPanel");
+        if (panel) panel.classList.add("hidden");
+        renderManageCatGrid();
+        renderCategorySelects();
+        renderCategoryFilterPills();
+        showToast(`Category "${catName}" deleted! 🗑️`);
+        try { audio?.playClick?.(); } catch (err) {}
+      }
+    });
   });
 
   // Bind click on each thumb
@@ -1376,7 +1512,7 @@ function openCatEditPanel(catName) {
   if (editNameLabel) editNameLabel.textContent = isDefault ? `${cat.name} (Default)` : cat.name;
   if (feedback) { feedback.textContent = ""; feedback.classList.remove("visible"); }
   if (deleteBtn) {
-    deleteBtn.style.display = isDefault ? "none" : "inline-flex";
+    deleteBtn.style.display = "inline-flex";
   }
 
   // Build "Products in this category" section
@@ -1449,15 +1585,10 @@ function openCatEditPanel(catName) {
 
 function handleDeleteCategory() {
   if (!_editingCatName || _editingCatName === '__NEW__') return;
-  const isDefault = DEFAULT_CATEGORIES.some(c => c.name.toLowerCase() === _editingCatName.toLowerCase());
-  if (isDefault) {
-    showToast("Default categories cannot be deleted! 🛡️", "warning");
-    return;
-  }
-  if (!confirm(`Are you sure you want to delete category "${_editingCatName}"?`)) return;
+  if (!confirm(`Are you sure you want to delete category "${_editingCatName}"? Products in this category will keep their items but won't have this category tag.`)) return;
 
   const catToDelete = _editingCatName;
-  const success = state.deleteCustomCategory(catToDelete);
+  const success = state.deleteCategory(catToDelete);
   if (success) {
     showToast(`Deleted category "${catToDelete}" and synced with live store! 🗑️`);
     _editingCatName = null;
@@ -3230,25 +3361,24 @@ document.addEventListener("DOMContentLoaded", () => {
     renderDashboardOverview();
   });
 
-  // Product category pills (filter + delete custom categories)
+  // Product category pills (filter + delete categories)
   document.getElementById("productCategoryPills")?.addEventListener("click", (e) => {
-    // Handle delete button on custom category pills
+    // Handle delete button on category pills
     const delBtn = e.target.closest(".pill-del-btn");
     if (delBtn) {
       e.stopPropagation();
       const catName = delBtn.dataset.delCat;
-      if (catName && confirm(`Remove custom category "${catName}"? Products in this category will keep their category label but the filter pill will be removed.`)) {
-        const deleted = state.deleteCustomCategory(catName);
+      if (catName && confirm(`Remove category "${catName}"? Products in this category will keep their items but this category will be removed.`)) {
+        const deleted = state.deleteCategory(catName);
         if (deleted) {
           if (state.currentCategoryFilter === catName) {
             state.currentCategoryFilter = "all";
           }
           renderCategoryFilterPills();
           renderCategorySelects();
+          renderManageCatGrid();
           showToast(`Removed category "${catName}" 🗑️`);
-          audio.playClick();
-        } else {
-          showToast("Default categories cannot be removed! 🔒", "warning");
+          audio.playClick?.();
         }
       }
       return;
@@ -3429,6 +3559,46 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("closeInvoiceModalBtn")?.addEventListener("click", closeInvoiceModal);
   document.getElementById("printInvoiceBtn")?.addEventListener("click", () => {
     printSlipDocument("invoicePrintArea", "Mayza Mart • Customer Packing Slip");
+  });
+
+  // Edit Order Modal Listeners
+  document.getElementById("closeEditOrderModalBtn")?.addEventListener("click", closeEditOrderModal);
+  document.getElementById("cancelEditOrderBtn")?.addEventListener("click", closeEditOrderModal);
+  document.getElementById("editOrderModal")?.addEventListener("click", (e) => {
+    if (e.target === document.getElementById("editOrderModal")) closeEditOrderModal();
+  });
+  document.getElementById("editOrderForm")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const orderId = document.getElementById("editOrderId")?.value;
+    const order = state.orders.find(o => String(o.id) === String(orderId));
+    if (!order) return;
+
+    order.status = document.getElementById("editOrderStatus")?.value || "New";
+    order.customer = order.customer || {};
+    order.customer.name = (document.getElementById("editOrderCustName")?.value || "").trim();
+    order.customer.phone = (document.getElementById("editOrderCustPhone")?.value || "").trim();
+    order.customer.address = (document.getElementById("editOrderCustAddress")?.value || "").trim();
+    order.customer.city = (document.getElementById("editOrderCustCity")?.value || "").trim();
+    order.customer.pin = (document.getElementById("editOrderCustPin")?.value || "").trim();
+    order.payment = (document.getElementById("editOrderPayment")?.value || "").trim();
+    order.total = parseFloat(document.getElementById("editOrderTotal")?.value) || 0;
+    order.tracking = (document.getElementById("editOrderTracking")?.value || "").trim();
+
+    state.save();
+    renderOrdersTable();
+    renderDashboardOverview();
+
+    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      try {
+        await window.mayzaSupabase.upsertOrder(order);
+      } catch (err) {
+        console.warn('Supabase upsertOrder error:', err);
+      }
+    }
+
+    closeEditOrderModal();
+    showToast(`Order #${order.id} updated successfully! 💾`);
+    try { audio?.playSuccess?.(); } catch (err) {}
   });
 
   // Coupons

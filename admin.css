@@ -4404,3 +4404,42 @@ body.twilight-theme .manage-cat-edit-panel {
   border-color: #ff4757;
 }
 
+/* Edit Order Row Button */
+.row-btn.edit-order-btn {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.row-btn.edit-order-btn:hover {
+  background: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+/* Delete button on Category Thumbnails in Manage Categories */
+.manage-cat-thumb-del-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  background: rgba(255, 71, 87, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s ease;
+  z-index: 5;
+}
+
+.manage-cat-thumb-del-btn:hover {
+  background: #e02424;
+  transform: scale(1.15);
+}
+
