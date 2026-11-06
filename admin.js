@@ -1252,6 +1252,13 @@ function renderManageCatGrid() {
   const allCats = state.getAllCategories();
   const defaultNames = new Set(DEFAULT_CATEGORIES.map(c => c.name.toLowerCase()));
 
+  // Build a product-count map per category (case-insensitive)
+  const countMap = {};
+  (state.products || []).forEach(p => {
+    const key = (p.category || '').toLowerCase().trim();
+    if (key) countMap[key] = (countMap[key] || 0) + 1;
+  });
+
   const newThumbHtml = `
     <div class="manage-cat-thumb manage-cat-add-new-thumb ${_editingCatName === '__NEW__' ? 'selected' : ''}" id="manageCatAddNewThumb" title="Create a brand new category">
       <div style="font-size:1.8rem; line-height:1; margin-bottom:4px;">＋</div>
@@ -1265,6 +1272,10 @@ function renderManageCatGrid() {
     const label = `${cat.emoji || ""} ${cat.name}`.trim();
     const selectedClass = _editingCatName === cat.name ? "selected" : "";
     const defaultBadge = isDefault ? `<span class="manage-cat-thumb-default-badge">DEFAULT</span>` : "";
+    const prodCount = countMap[(cat.name || '').toLowerCase().trim()] || 0;
+    const countBadge = prodCount > 0
+      ? `<span class="manage-cat-prod-count">${prodCount} product${prodCount === 1 ? '' : 's'}</span>`
+      : `<span class="manage-cat-prod-count manage-cat-prod-count-empty">0 products</span>`;
 
     return `
       <div class="manage-cat-thumb ${selectedClass}" data-cat-name="${cat.name}" title="Click to edit ${cat.name}">
@@ -1272,6 +1283,7 @@ function renderManageCatGrid() {
         <img src="${cat.image || 'assets/cat-return-gifts.jpg'}" alt="${cat.name}"
              onerror="this.onerror=null; this.src='assets/cat-return-gifts.jpg';">
         <div class="manage-cat-thumb-label">${label}</div>
+        ${countBadge}
         <div class="manage-cat-thumb-edit-icon">✏️</div>
       </div>
     `;
@@ -1367,10 +1379,66 @@ function openCatEditPanel(catName) {
     deleteBtn.style.display = isDefault ? "none" : "inline-flex";
   }
 
-  // Show panel
+  // Build "Products in this category" section
+  const catProds = (state.products || []).filter(p =>
+    (p.category || '').trim().toLowerCase() === catName.toLowerCase()
+  );
+
+  // Remove existing product list if any
+  let existingProdSection = document.getElementById('manageCatProductsList');
+  if (existingProdSection) existingProdSection.remove();
+
   const panel = document.getElementById("manageCatEditPanel");
+
+  // Create the product section HTML
+  const prodSection = document.createElement('div');
+  prodSection.id = 'manageCatProductsList';
+  prodSection.style.cssText = 'margin-top:18px; border-top:1px solid rgba(136,14,79,0.12); padding-top:14px;';
+
+  if (catProds.length === 0) {
+    prodSection.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h4 style="margin:0; font-size:0.9rem; color:var(--primary); font-weight:700;">📦 Products in this Category</h4>
+        <span style="font-size:0.78rem; color:var(--text-muted); background:rgba(136,14,79,0.08); border-radius:12px; padding:2px 8px;">0 products</span>
+      </div>
+      <div style="text-align:center; padding:18px 0; color:var(--text-muted); font-size:0.85rem;">
+        <div style="font-size:1.6rem; margin-bottom:6px;">📭</div>
+        <p style="margin:0;">No products assigned to this category yet.</p>
+        <p style="margin:4px 0 0; font-size:0.78rem; opacity:0.75;">Add products from the Products tab and set their category.</p>
+      </div>
+    `;
+  } else {
+    const prodRows = catProds.map(p => {
+      const imgSrc = p.image || 'assets/p-clips.jpg';
+      const price = typeof p.price === 'number' ? p.price : (parseFloat(p.price) || 0);
+      const stock = p.stock !== undefined ? p.stock : '—';
+      return `
+        <div style="display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px solid rgba(136,14,79,0.07);">
+          <img src="${imgSrc}" alt="${p.title || ''}" style="width:38px; height:38px; object-fit:cover; border-radius:8px; border:1px solid rgba(136,14,79,0.12);"
+               onerror="this.onerror=null; this.src='assets/p-clips.jpg';">
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:0.82rem; font-weight:600; color:var(--text-dark); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.title || 'Unnamed Product'}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">₹${price} &nbsp;•&nbsp; SKU: ${p.sku || 'N/A'} &nbsp;•&nbsp; Stock: ${stock}</div>
+          </div>
+          <span style="font-size:0.72rem; padding:2px 7px; background:rgba(136,14,79,0.08); border-radius:10px; color:var(--primary); white-space:nowrap;">${p.tag || 'Product'}</span>
+        </div>
+      `;
+    }).join('');
+
+    prodSection.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h4 style="margin:0; font-size:0.9rem; color:var(--primary); font-weight:700;">📦 Products in this Category</h4>
+        <span style="font-size:0.78rem; color:var(--primary); background:rgba(136,14,79,0.08); border-radius:12px; padding:2px 8px; font-weight:600;">${catProds.length} product${catProds.length === 1 ? '' : 's'}</span>
+      </div>
+      <div style="max-height:220px; overflow-y:auto; padding-right:2px;">
+        ${prodRows}
+      </div>
+    `;
+  }
+
   if (panel) {
     panel.classList.remove("hidden");
+    panel.appendChild(prodSection);
     setTimeout(() => panel.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50);
   }
 
@@ -3681,6 +3749,13 @@ function initSupabaseManager() {
   // Initial cloud sync if configured
   if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
     state.initCloudSync().then((hasChanges) => {
+      // Always refresh category UI after cloud sync so real product categories show
+      renderCategoryFilterPills();
+      renderCategorySelects();
+      const manageCatModal = document.getElementById("manageCategoriesModal");
+      if (manageCatModal && manageCatModal.classList.contains("active")) {
+        renderManageCatGrid();
+      }
       if (hasChanges) {
         renderDashboardOverview();
         renderOrdersTable();

@@ -4226,6 +4226,23 @@ body.twilight-theme .manage-cat-edit-panel {
   letter-spacing: 0.5px;
 }
 
+.manage-cat-prod-count {
+  display: block;
+  padding: 2px 8px 5px;
+  font-size: 0.69rem;
+  font-weight: 700;
+  color: var(--primary, #D9657B);
+  background: rgba(217, 101, 123, 0.08);
+  text-align: center;
+  letter-spacing: 0.2px;
+}
+
+.manage-cat-prod-count-empty {
+  color: var(--text-muted, #aaa);
+  background: rgba(0,0,0,0.04);
+  font-weight: 500;
+}
+
 /* =========================================================
    IN-STORE POS BILLING & CHANNEL STYLES
    ========================================================= */
