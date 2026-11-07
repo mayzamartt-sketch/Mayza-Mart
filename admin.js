@@ -123,8 +123,8 @@ class StudioState {
         }
       });
     } catch(e) {}
-    const custom = (Array.isArray(this.customCategories) ? this.customCategories : [])
-      .filter(c => !deletedCats.has((c.name || '').toLowerCase().trim()));
+    // Custom categories explicitly in this.customCategories are ALWAYS active
+    const custom = (Array.isArray(this.customCategories) ? this.customCategories : []);
     
     const existingNames = new Set([
       ...defaults.map(c => c.name.toLowerCase()),
@@ -151,15 +151,23 @@ class StudioState {
     return [...defaults, ...custom, ...extraFromProducts];
   }
 
-  addCustomCategory(name, emoji = "✨", image = "", subtitle = "") {
+  async addCustomCategory(name, emoji = "✨", image = "", subtitle = "") {
     const trimmed = (name || "").trim();
     if (!trimmed) return null;
 
-    // 1. Un-delete from local storage if previously marked deleted
+    // 1. Un-delete from local storage & overrides if previously marked deleted
     try {
       let deletedCats = JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]');
       const filtered = deletedCats.filter(c => String(c).toLowerCase().trim() !== trimmed.toLowerCase());
       localStorage.setItem('mm_deleted_categories', JSON.stringify(filtered));
+    } catch(e) {}
+
+    let overrides = {};
+    try {
+      overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+      if (Array.isArray(overrides.__deleted_categories__)) {
+        overrides.__deleted_categories__ = overrides.__deleted_categories__.filter(c => String(c).toLowerCase().trim() !== trimmed.toLowerCase());
+      }
     } catch(e) {}
 
     const defaultImg = "assets/cat-return-gifts.jpg";
@@ -206,21 +214,27 @@ class StudioState {
       }
     }
 
+    try {
+      const activeDeleted = JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]');
+      overrides.__deleted_categories__ = activeDeleted;
+      localStorage.setItem('mm_category_overrides', JSON.stringify(overrides));
+    } catch(e) {}
+
     this.save();
 
     if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
       try {
-        const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
-        const deletedCats = JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]');
-        overrides.__deleted_categories__ = deletedCats;
-        window.mayzaSupabase.saveStoreCategories(this.customCategories, overrides).catch(console.warn);
-      } catch(e) {}
+        await window.mayzaSupabase.saveStoreCategories(this.customCategories, overrides);
+        console.log('[StudioState] Category saved and synced to cloud:', trimmed);
+      } catch(e) {
+        console.warn('[StudioState] Cloud save error:', e);
+      }
     }
 
     return customCat;
   }
 
-  deleteCategory(name) {
+  async deleteCategory(name) {
     if (!name) return false;
     const clean = name.trim();
     const cleanLower = clean.toLowerCase();
@@ -244,7 +258,8 @@ class StudioState {
         const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
         const deletedCats = JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]');
         overrides.__deleted_categories__ = deletedCats;
-        window.mayzaSupabase.saveStoreCategories(this.customCategories, overrides).catch(console.warn);
+        localStorage.setItem('mm_category_overrides', JSON.stringify(overrides));
+        await window.mayzaSupabase.saveStoreCategories(this.customCategories, overrides);
       } catch(e) {}
     }
     return true;
@@ -1396,12 +1411,13 @@ function handleCategoryFileUpload(isWholesale = false, fileInput) {
   });
 }
 
-function saveInlineCategory(isWholesale = false) {
+async function saveInlineCategory(isWholesale = false) {
   const input = document.getElementById(isWholesale ? "wsInlineCategoryName" : "inlineCategoryName");
   const subtitleInput = document.getElementById(isWholesale ? "wsInlineCategorySubtitle" : "inlineCategorySubtitle");
   const imageUrlInput = document.getElementById(isWholesale ? "wsInlineCategoryImageUrl" : "inlineCategoryImageUrl");
   const emojiInput = document.getElementById(isWholesale ? "wsInlineCategoryEmoji" : "inlineCategoryEmoji");
   const feedback = document.getElementById(isWholesale ? "wsInlineCategoryFeedback" : "inlineCategoryFeedback");
+  const saveBtn = document.getElementById(isWholesale ? "saveWsInlineCategoryBtn" : "saveInlineCategoryBtn");
 
   const name = (input?.value || "").trim();
   const emoji = (emojiInput?.value || "").trim() || "✨";
@@ -1417,25 +1433,26 @@ function saveInlineCategory(isWholesale = false) {
     return;
   }
 
-  const existing = state.getAllCategories().find(c => c.name.toLowerCase() === name.toLowerCase());
-  if (existing) {
-    if (existing.isCustom && (image || subtitle)) {
-      state.addCustomCategory(name, emoji, image, subtitle);
-    }
-    renderCategorySelects(existing.name);
-    renderCategoryFilterPills();
-    hideInlineCategoryCreator(isWholesale);
-    showToast(`Category "${existing.name}" is already available and selected! ✨`);
-    return;
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
   }
 
-  const newCat = state.addCustomCategory(name, emoji, image, subtitle);
-  if (newCat) {
-    renderCategorySelects(newCat.name);
+  try {
+    const newCat = await state.addCustomCategory(name, emoji, image, subtitle);
+    renderCategorySelects(newCat ? newCat.name : name);
     renderCategoryFilterPills();
     hideInlineCategoryCreator(isWholesale);
-    showToast(`Added new category "${newCat.emoji} ${newCat.name}" with live store sync! 🌸`);
+    showToast(`Category "${emoji} ${name}" added & synced with live store! 🌸`);
     if (audio?.playSuccess) audio.playSuccess();
+  } catch (err) {
+    console.warn('Error saving inline category:', err);
+    showToast(`Category save warning: ${err.message}`, "warning");
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Add Category";
+    }
   }
 }
 
@@ -1508,12 +1525,12 @@ function renderManageCatGrid() {
 
   // Bind click on delete button of each thumb
   grid.querySelectorAll(".manage-cat-thumb-del-btn").forEach(delBtn => {
-    delBtn.addEventListener("click", (e) => {
+    delBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
       const catName = delBtn.dataset.delCat;
       if (!catName) return;
       if (confirm(`Are you sure you want to delete category "${catName}"? Products in this category will keep their items but won't have this category tag.`)) {
-        state.deleteCategory(catName);
+        await state.deleteCategory(catName);
         _editingCatName = null;
         const panel = document.getElementById("manageCatEditPanel");
         if (panel) panel.classList.add("hidden");
@@ -1680,12 +1697,12 @@ function openCatEditPanel(catName) {
   if (fileInput) fileInput.value = "";
 }
 
-function handleDeleteCategory() {
+async function handleDeleteCategory() {
   if (!_editingCatName || _editingCatName === '__NEW__') return;
   if (!confirm(`Are you sure you want to delete category "${_editingCatName}"? Products in this category will keep their items but won't have this category tag.`)) return;
 
   const catToDelete = _editingCatName;
-  const success = state.deleteCategory(catToDelete);
+  const success = await state.deleteCategory(catToDelete);
   if (success) {
     showToast(`Deleted category "${catToDelete}" and synced with live store! 🗑️`);
     _editingCatName = null;
@@ -1725,7 +1742,7 @@ async function saveCategoryImageChanges() {
   }
 
   try {
-    const saved = state.addCustomCategory(newName, newEmoji, newImage, newSubtitle);
+    const saved = await state.addCustomCategory(newName, newEmoji, newImage, newSubtitle);
     _editingCatName = saved ? saved.name : newName;
 
     // Close edit panel so the newly added/updated category is front-and-center in the grid

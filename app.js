@@ -997,7 +997,7 @@ class MayzaEntranceApp {
   // =========================================================
   // LIVE STORE CATEGORIES REAL-TIME SYNC
   // =========================================================
-  syncLiveCategories() {
+  syncLiveCategories(skipCloudFetch = false) {
     const strip = document.getElementById('storeCategoryStrip') || document.querySelector('.glass-category-strip');
     const grid = document.getElementById('storeCategoryCardsGrid') || document.querySelector('.category-cards-grid');
 
@@ -1139,16 +1139,13 @@ class MayzaEntranceApp {
     this.bindCategoryFilterClicks();
 
     // 4. Asynchronously fetch latest categories from Supabase cloud (for live visitors / multi-device sync)
-    if (window.mayzaSupabase && window.mayzaSupabase.isConfigured() && !this._fetchingCloudCategories) {
+    if (!skipCloudFetch && window.mayzaSupabase && !this._fetchingCloudCategories) {
       this._fetchingCloudCategories = true;
       window.mayzaSupabase.fetchStoreCategories().then(cloudCats => {
         this._fetchingCloudCategories = false;
-        if (cloudCats && Array.isArray(cloudCats.customCategories)) {
-          const currentCount = (JSON.parse(localStorage.getItem('mm_custom_categories') || '[]')).length;
-          if (cloudCats.customCategories.length !== currentCount || cloudCats.categoryOverrides) {
-            // Re-render with fresh cloud categories if count or overrides changed
-            this.syncLiveCategories();
-          }
+        if (cloudCats && (Array.isArray(cloudCats.customCategories) || cloudCats.categoryOverrides)) {
+          // Re-render once with fresh cloud categories (skipCloudFetch = true prevents any loop!)
+          this.syncLiveCategories(true);
         }
       }).catch(err => {
         this._fetchingCloudCategories = false;
@@ -1160,22 +1157,22 @@ class MayzaEntranceApp {
     if (!this.hasCategoryListeners) {
       this.hasCategoryListeners = true;
       window.addEventListener('mayza:categories-updated', () => {
-        this.syncLiveCategories();
+        this.syncLiveCategories(true);
       });
       window.addEventListener('mayza:cloud-categories-changed', () => {
         console.log('[Storefront Realtime] Cloud categories updated');
         if (window.mayzaSupabase?.fetchStoreCategories) {
-          window.mayzaSupabase.fetchStoreCategories().then(() => this.syncLiveCategories());
+          window.mayzaSupabase.fetchStoreCategories().then(() => this.syncLiveCategories(true));
         } else {
-          this.syncLiveCategories();
+          this.syncLiveCategories(true);
         }
       });
       window.addEventListener('mayza:cloud-products-changed', () => {
-        this.syncLiveCategories();
+        this.syncLiveCategories(true);
       });
       window.addEventListener('storage', (e) => {
         if (e.key === 'mm_custom_categories' || e.key === 'mm_categories_timestamp' || e.key === 'mm_category_overrides' || e.key === 'mm_products' || e.key === 'mm_deleted_categories') {
-          this.syncLiveCategories();
+          this.syncLiveCategories(true);
         }
       });
     }

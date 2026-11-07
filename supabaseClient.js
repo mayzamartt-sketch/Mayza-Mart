@@ -20,6 +20,10 @@
       this.client = null;
       this.url = localStorage.getItem(STORAGE_KEYS.URL) || DEFAULT_URL;
       this.key = localStorage.getItem(STORAGE_KEYS.KEY) || DEFAULT_KEY;
+      if (this.key && this.key.includes('B0155-kG_8M4Fj10aUe5Y-t7kS4z6wG-12P_Vf4Jq2w')) {
+        this.key = DEFAULT_KEY;
+        try { localStorage.setItem(STORAGE_KEYS.KEY, DEFAULT_KEY); } catch (e) {}
+      }
       this.isConnected = false;
       this.lastSyncTime = null;
       this.realtimeChannel = null;
@@ -696,22 +700,47 @@
         if (o) overrides = JSON.parse(o);
       } catch (e) {}
 
-      if (!this.isConfigured()) {
-        return { customCategories: custom, categoryOverrides: overrides };
+      let cloudDesc = null;
+
+      // 1. Try Supabase client SDK first
+      if (this.client) {
+        try {
+          const { data, error } = await this.client
+            .from('coupons')
+            .select('*')
+            .eq('code', 'STORE_CATEGORIES')
+            .limit(1);
+
+          if (!error && data && data.length > 0 && data[0].desc) {
+            cloudDesc = data[0].desc;
+          }
+        } catch (e) {}
       }
 
-      try {
-        const { data, error } = await this.client
-          .from('coupons')
-          .select('*')
-          .eq('code', 'STORE_CATEGORIES')
-          .limit(1);
+      // 2. Direct REST fallback if SDK didn't return data (works offline/before SDK loads)
+      if (!cloudDesc && this.url && this.key) {
+        try {
+          const res = await fetch(`${this.url}/rest/v1/coupons?code=eq.STORE_CATEGORIES&select=*`, {
+            headers: {
+              'apikey': this.key,
+              'Authorization': `Bearer ${this.key}`
+            }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data) && data.length > 0 && data[0].desc) {
+              cloudDesc = data[0].desc;
+            }
+          }
+        } catch (e) {}
+      }
 
-        if (!error && data && data.length > 0 && data[0].desc) {
-          const parsed = JSON.parse(data[0].desc);
+      if (cloudDesc) {
+        try {
+          const parsed = JSON.parse(cloudDesc);
           if (parsed && typeof parsed === 'object') {
             if (Array.isArray(parsed.customCategories)) {
-              // Sanitize any legacy huge data URLs to keep localStorage safe
+              // Sanitize huge data URLs to keep storage clean
               custom = parsed.customCategories.map(c => {
                 if (c && c.image && c.image.length > 50000) {
                   return { ...c, image: 'assets/cat-return-gifts.jpg' };
@@ -733,9 +762,9 @@
             }
             return { customCategories: custom, categoryOverrides: overrides };
           }
+        } catch (err) {
+          console.warn('[Supabase] parse STORE_CATEGORIES desc warning:', err);
         }
-      } catch (err) {
-        console.warn('[Supabase] fetchStoreCategories error:', err);
       }
 
       return { customCategories: custom, categoryOverrides: overrides };
@@ -745,36 +774,77 @@
       const custom = Array.isArray(customCategories) ? customCategories : [];
       const overrides = (categoryOverrides && typeof categoryOverrides === 'object') ? categoryOverrides : {};
 
-      localStorage.setItem('mm_custom_categories', JSON.stringify(custom));
-      localStorage.setItem('mm_category_overrides', JSON.stringify(overrides));
-      localStorage.setItem('mm_categories_timestamp', Date.now().toString());
+      try {
+        localStorage.setItem('mm_custom_categories', JSON.stringify(custom));
+        localStorage.setItem('mm_category_overrides', JSON.stringify(overrides));
+        localStorage.setItem('mm_categories_timestamp', Date.now().toString());
+        if (Array.isArray(overrides.__deleted_categories__)) {
+          localStorage.setItem('mm_deleted_categories', JSON.stringify(overrides.__deleted_categories__));
+        }
+      } catch (e) {
+        console.warn('[Supabase] LocalStorage write error in saveStoreCategories:', e);
+      }
 
-      if (this.isConfigured()) {
+      const payload = JSON.stringify({
+        customCategories: custom,
+        categoryOverrides: overrides,
+        updatedAt: new Date().toISOString()
+      });
+
+      const row = {
+        code: 'STORE_CATEGORIES',
+        discount: 0,
+        min_spend: 0,
+        desc: payload,
+        active: true,
+        uses: custom.length
+      };
+
+      let savedToCloud = false;
+
+      // 1. Try SDK upsert with explicit onConflict
+      if (this.client) {
         try {
-          const payload = JSON.stringify({
-            customCategories: custom,
-            categoryOverrides: overrides,
-            updatedAt: new Date().toISOString()
-          });
-          const row = {
-            code: 'STORE_CATEGORIES',
-            discount: 0,
-            min_spend: 0,
-            desc: payload,
-            active: true,
-            uses: custom.length
-          };
-          await this.client.from('coupons').upsert(row);
-          console.log('[Supabase] Persisted store categories to cloud:', custom.length);
+          const { error } = await this.client.from('coupons').upsert(row, { onConflict: 'code' });
+          if (!error) {
+            savedToCloud = true;
+            console.log('[Supabase] Persisted store categories to cloud via SDK:', custom.length);
+          } else {
+            console.warn('[Supabase] SDK saveStoreCategories warning:', error);
+          }
         } catch (err) {
-          console.warn('[Supabase] saveStoreCategories error:', err);
+          console.warn('[Supabase] SDK saveStoreCategories error:', err);
+        }
+      }
+
+      // 2. Direct REST fallback (bulletproof, works even if SDK fails or CDN is delayed)
+      if (!savedToCloud && this.url && this.key) {
+        try {
+          const res = await fetch(`${this.url}/rest/v1/coupons?on_conflict=code`, {
+            method: 'POST',
+            headers: {
+              'apikey': this.key,
+              'Authorization': `Bearer ${this.key}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=merge-duplicates,return=minimal'
+            },
+            body: JSON.stringify(row)
+          });
+          if (res.ok) {
+            savedToCloud = true;
+            console.log('[Supabase] Persisted store categories to cloud via direct REST:', custom.length);
+          } else {
+            console.warn('[Supabase] Direct REST saveStoreCategories failed with status:', res.status);
+          }
+        } catch (fetchErr) {
+          console.warn('[Supabase] Direct REST fetch error in saveStoreCategories:', fetchErr);
         }
       }
 
       window.dispatchEvent(new CustomEvent('mayza:categories-updated', {
         detail: { categories: custom, customCategories: custom, categoryOverrides: overrides }
       }));
-      return true;
+      return savedToCloud;
     }
 
     async fetchVips() {
