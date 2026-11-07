@@ -1059,57 +1059,45 @@ class MayzaEntranceApp {
       }
     } catch(e) {}
 
-    const uniqueCustom = formattedCustom.filter(c => !defaultNames.has((c.name || '').toLowerCase().trim()));
+    // Gather categories from active custom categories
+    const activeCustomNames = new Set(formattedCustom.map(c => (c.name || '').toLowerCase().trim()));
 
-    // --- PRIORITISE real Supabase product categories at the top of the list ---
-    // Gather real product categories from localStorage (populated after cloud sync)
+    // Also gather any categories from real products
     const cloudProductCats = [];
-    const cloudCatNames = new Set();
     try {
       const storedProds = JSON.parse(localStorage.getItem('mm_products') || '[]');
       storedProds.forEach(p => {
         const pCat = (p.category || '').trim();
-        if (pCat && !cloudCatNames.has(pCat.toLowerCase())) {
-          cloudCatNames.add(pCat.toLowerCase());
-          // Find if any default or custom already covers this category
-          const existingDefault = defaultCategories.find(d => d.name.toLowerCase() === pCat.toLowerCase());
-          const existingCustom = uniqueCustom.find(c => (c.name || '').toLowerCase() === pCat.toLowerCase());
-          if (!existingDefault && !existingCustom) {
-            // Brand new category from real products — add it with the product's image
-            cloudProductCats.push({
-              name: pCat,
-              emoji: '🏷️',
-              image: p.image || 'assets/cat-return-gifts.jpg',
-              subtitle: 'Explore collection',
-              colorClass: colorCycle[cloudProductCats.length % colorCycle.length],
-              isCustom: true,
-              hasRealProducts: true
-            });
-          }
+        if (pCat && !activeCustomNames.has(pCat.toLowerCase()) && !defaultNames.has(pCat.toLowerCase())) {
+          activeCustomNames.add(pCat.toLowerCase());
+          cloudProductCats.push({
+            name: pCat,
+            emoji: '🏷️',
+            image: p.image || 'assets/cat-return-gifts.jpg',
+            subtitle: 'Explore collection',
+            colorClass: colorCycle[cloudProductCats.length % colorCycle.length],
+            isCustom: true,
+            hasRealProducts: true
+          });
         }
       });
     } catch (e) {}
 
-    // Build final list: cloud product categories FIRST, then custom, then defaults (only if they have products too)
-    const hasCloudProducts = cloudProductCats.length > 0;
-    let allCategories;
-    if (hasCloudProducts) {
-      // Show: real cloud cats + custom + defaults that also have cloud products
-      const defaultsWithProducts = defaultCategories.filter(d =>
-        cloudCatNames.has(d.name.toLowerCase())
-      );
-      // Any defaults that DON'T have cloud products go to the end so users see real items first
-      const defaultsWithoutProducts = defaultCategories.filter(d =>
-        !cloudCatNames.has(d.name.toLowerCase())
-      );
-      allCategories = [...cloudProductCats, ...uniqueCustom, ...defaultsWithProducts, ...defaultsWithoutProducts];
-    } else {
-      // No cloud products yet — show defaults + custom
-      allCategories = [...defaultCategories, ...uniqueCustom];
-    }
+    // Remaining defaults that haven't been replaced by custom categories
+    const remainingDefaults = defaultCategories.filter(d =>
+      !activeCustomNames.has(d.name.toLowerCase().trim())
+    );
 
-    // Filter out any explicitly deleted categories
-    allCategories = allCategories.filter(c => !deletedCats.has((c.name || '').toLowerCase().trim()));
+    // Build complete list: active custom categories first, then product-derived, then remaining defaults
+    let allCategories = [...formattedCustom, ...cloudProductCats, ...remainingDefaults];
+
+    // Filter out deleted categories, but NEVER filter out active custom categories explicitly created/saved
+    const customNameSet = new Set(formattedCustom.map(c => (c.name || '').toLowerCase().trim()));
+    allCategories = allCategories.filter(c => {
+      const clean = (c.name || '').toLowerCase().trim();
+      if (customNameSet.has(clean)) return true;
+      return !deletedCats.has(clean);
+    });
 
     const knownNames = new Set(allCategories.map(c => (c.name || '').toLowerCase().trim()));
 

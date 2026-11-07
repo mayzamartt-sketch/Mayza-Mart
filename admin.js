@@ -78,22 +78,28 @@ class StudioState {
   }
 
   save() {
-    localStorage.setItem("mm_products", JSON.stringify(this.products));
-    localStorage.setItem("mm_products_timestamp", Date.now().toString());
-    localStorage.setItem("mm_orders", JSON.stringify(this.orders));
-    localStorage.setItem("mm_coupons", JSON.stringify(this.coupons));
-    localStorage.setItem("mm_vips", JSON.stringify(this.vips));
-    localStorage.setItem("mm_reviews", JSON.stringify(this.reviews));
-    localStorage.setItem("mm_wholesale", JSON.stringify(this.wholesalePurchases));
-    localStorage.setItem("mm_custom_categories", JSON.stringify(this.customCategories || []));
-    localStorage.setItem("mm_categories_timestamp", Date.now().toString());
+    try {
+      localStorage.setItem("mm_products", JSON.stringify(this.products));
+      localStorage.setItem("mm_products_timestamp", Date.now().toString());
+      localStorage.setItem("mm_orders", JSON.stringify(this.orders));
+      localStorage.setItem("mm_coupons", JSON.stringify(this.coupons));
+      localStorage.setItem("mm_vips", JSON.stringify(this.vips));
+      localStorage.setItem("mm_reviews", JSON.stringify(this.reviews));
+      localStorage.setItem("mm_wholesale", JSON.stringify(this.wholesalePurchases));
+      localStorage.setItem("mm_custom_categories", JSON.stringify(this.customCategories || []));
+      localStorage.setItem("mm_categories_timestamp", Date.now().toString());
+    } catch (err) {
+      console.warn("Storage quota or write warning:", err);
+    }
 
-    window.dispatchEvent(new CustomEvent('mayza:products-updated', {
-      detail: { products: this.products }
-    }));
-    window.dispatchEvent(new CustomEvent('mayza:categories-updated', {
-      detail: { categories: this.getAllCategories(), customCategories: this.customCategories }
-    }));
+    try {
+      window.dispatchEvent(new CustomEvent('mayza:products-updated', {
+        detail: { products: this.products }
+      }));
+      window.dispatchEvent(new CustomEvent('mayza:categories-updated', {
+        detail: { categories: this.getAllCategories(), customCategories: this.customCategories }
+      }));
+    } catch (e) {}
   }
 
   getAllCategories() {
@@ -155,47 +161,51 @@ class StudioState {
       const filtered = deletedCats.filter(c => String(c).toLowerCase().trim() !== trimmed.toLowerCase());
       localStorage.setItem('mm_deleted_categories', JSON.stringify(filtered));
     } catch(e) {}
-    
-    const existing = this.getAllCategories().find(c => c.name.toLowerCase() === trimmed.toLowerCase());
-    if (existing) {
-      if (existing.isCustom) {
-        if (image) existing.image = image;
-        if (subtitle) existing.subtitle = subtitle;
-        if (emoji && emoji !== "✨") existing.emoji = emoji;
-      } else {
-        const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
-        overrides[existing.name] = {
-          image: image || existing.image,
-          subtitle: subtitle || existing.subtitle,
-          emoji: (emoji && emoji !== "✨") ? emoji : existing.emoji
-        };
-        localStorage.setItem('mm_category_overrides', JSON.stringify(overrides));
-      }
-      this.save();
-      if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
-        try {
-          const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
-          const deletedCats = JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]');
-          overrides.__deleted_categories__ = deletedCats;
-          window.mayzaSupabase.saveStoreCategories(this.customCategories, overrides).catch(console.warn);
-        } catch(e) {}
-      }
-      return existing;
-    }
 
     const defaultImg = "assets/cat-return-gifts.jpg";
-    const newCat = {
-      name: trimmed,
-      emoji: (emoji || "").trim() || "✨",
-      image: (image || "").trim() || defaultImg,
-      subtitle: (subtitle || "").trim() || "Explore collection",
-      isCustom: true
-    };
-
     if (!Array.isArray(this.customCategories)) {
       this.customCategories = [];
     }
-    this.customCategories.push(newCat);
+
+    // Check if it's already in this.customCategories
+    let customCat = this.customCategories.find(c => (c.name || '').toLowerCase().trim() === trimmed.toLowerCase());
+    if (customCat) {
+      customCat.name = trimmed;
+      if (image) customCat.image = image;
+      if (subtitle) customCat.subtitle = subtitle;
+      if (emoji && emoji !== "✨") customCat.emoji = emoji;
+    } else {
+      customCat = {
+        name: trimmed,
+        emoji: (emoji || "").trim() || "✨",
+        image: (image || "").trim() || defaultImg,
+        subtitle: (subtitle || "").trim() || "Explore collection",
+        isCustom: true
+      };
+      this.customCategories.push(customCat);
+    }
+
+    // Also update overrides if it matches a default category
+    const defaultNames = new Set(DEFAULT_CATEGORIES.map(c => c.name.toLowerCase().trim()));
+    if (defaultNames.has(trimmed.toLowerCase())) {
+      const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+      overrides[trimmed] = {
+        image: customCat.image,
+        subtitle: customCat.subtitle,
+        emoji: customCat.emoji
+      };
+      if (Array.isArray(overrides.__deleted_categories__)) {
+        overrides.__deleted_categories__ = overrides.__deleted_categories__.filter(c => String(c).toLowerCase().trim() !== trimmed.toLowerCase());
+      }
+      localStorage.setItem('mm_category_overrides', JSON.stringify(overrides));
+      const def = DEFAULT_CATEGORIES.find(c => c.name.toLowerCase().trim() === trimmed.toLowerCase());
+      if (def) {
+        if (image) def.image = image;
+        if (subtitle) def.subtitle = subtitle;
+        if (emoji && emoji !== "✨") def.emoji = emoji;
+      }
+    }
+
     this.save();
 
     if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
@@ -206,7 +216,8 @@ class StudioState {
         window.mayzaSupabase.saveStoreCategories(this.customCategories, overrides).catch(console.warn);
       } catch(e) {}
     }
-    return newCat;
+
+    return customCat;
   }
 
   deleteCategory(name) {
@@ -1687,7 +1698,7 @@ function handleDeleteCategory() {
   }
 }
 
-function saveCategoryImageChanges() {
+async function saveCategoryImageChanges() {
   if (!_editingCatName) return;
 
   const nameInput = document.getElementById("manageCatNameInput");
@@ -1695,6 +1706,7 @@ function saveCategoryImageChanges() {
   const emojiInput = document.getElementById("manageCatEmojiInput");
   const imageUrlInput = document.getElementById("manageCatImageUrl");
   const feedback = document.getElementById("manageCatFeedback");
+  const saveBtn = document.getElementById("saveCatChangesBtn");
 
   const newName = (nameInput?.value || "").trim();
   const newSubtitle = (subtitleInput?.value || "").trim();
@@ -1707,87 +1719,41 @@ function saveCategoryImageChanges() {
     return;
   }
 
-  // If creating brand new category
-  if (_editingCatName === '__NEW__') {
-    const created = state.addCustomCategory(newName, newEmoji, newImage, newSubtitle);
-    if (created) {
-      _editingCatName = created.name;
-      renderManageCatGrid();
-      renderCategorySelects(created.name);
-      renderCategoryFilterPills();
-      showToast(`Added new category "${created.emoji} ${created.name}" with live cloud sync! 🌸`);
-      if (feedback) { feedback.textContent = ""; feedback.classList.remove("visible"); }
-      audio.playSuccess?.();
-    }
-    return;
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
   }
 
-  const allCats = state.getAllCategories();
-  const cat = allCats.find(c => c.name === _editingCatName);
-  if (!cat) return;
+  try {
+    const saved = state.addCustomCategory(newName, newEmoji, newImage, newSubtitle);
+    _editingCatName = saved ? saved.name : newName;
 
-  const defaultNames = new Set(DEFAULT_CATEGORIES.map(c => c.name.toLowerCase()));
-  const isDefault = defaultNames.has(_editingCatName.toLowerCase());
+    // Close edit panel so the newly added/updated category is front-and-center in the grid
+    const panel = document.getElementById("manageCatEditPanel");
+    if (panel) panel.classList.add("hidden");
+    _editingCatName = null;
 
-  // For default categories: only allow updating image and subtitle (not name/emoji since they're protected)
-  // For custom categories: allow all edits
-  if (isDefault) {
-    // Store default category overrides in a separate localStorage key
-    const overrides = JSON.parse(localStorage.getItem("mm_category_overrides") || "{}");
-    overrides[_editingCatName] = {
-      image: newImage || cat.image,
-      subtitle: newSubtitle || cat.subtitle,
-      emoji: newEmoji || cat.emoji
-    };
-    localStorage.setItem("mm_category_overrides", JSON.stringify(overrides));
-    localStorage.setItem("mm_categories_timestamp", Date.now().toString());
-
-    // Apply to in-memory DEFAULT_CATEGORIES too for immediate effect
-    const defCat = DEFAULT_CATEGORIES.find(c => c.name === _editingCatName);
-    if (defCat) {
-      if (newImage) defCat.image = newImage;
-      if (newSubtitle) defCat.subtitle = newSubtitle;
-      if (newEmoji) defCat.emoji = newEmoji;
-    }
-
-    // Push overrides to Supabase cloud
-    if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
-      window.mayzaSupabase.saveStoreCategories(state.customCategories, overrides).catch(console.warn);
-    }
-
-    showToast(`Updated picture & details for "${_editingCatName}"! 🌸 Syncing to live store...`);
-  } else {
-    // Custom category — update directly in state
-    const customCat = state.customCategories.find(c => c.name === _editingCatName);
-    if (customCat) {
-      customCat.image = newImage || customCat.image;
-      customCat.subtitle = newSubtitle || customCat.subtitle;
-      customCat.emoji = newEmoji || customCat.emoji;
-      if (newName !== _editingCatName) {
-        customCat.name = newName;
-        _editingCatName = newName;
-      }
-    }
-    state.save();
-
-    // Push to Supabase cloud
-    if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
-      const overrides = JSON.parse(localStorage.getItem("mm_category_overrides") || "{}");
-      window.mayzaSupabase.saveStoreCategories(state.customCategories, overrides).catch(console.warn);
-    }
-
-    renderCategorySelects();
+    renderManageCatGrid();
+    renderCategorySelects(saved ? saved.name : newName);
     renderCategoryFilterPills();
-    showToast(`Category "${newName}" updated! 🖼️ Live store refreshed!`);
+    renderProductMatrix();
+
+    window.dispatchEvent(new CustomEvent('mayza:categories-updated', {
+      detail: { categories: state.getAllCategories(), customCategories: state.customCategories }
+    }));
+
+    showToast(`Category "${newEmoji} ${newName}" saved & synced with live store! 🌸`);
+    if (feedback) { feedback.textContent = ""; feedback.classList.remove("visible"); }
+    audio.playSuccess?.();
+  } catch (err) {
+    console.warn('Error saving category:', err);
+    showToast(`Category save warning: ${err.message}`, "warning");
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save Changes";
+    }
   }
-
-  window.dispatchEvent(new CustomEvent('mayza:categories-updated', {
-    detail: { categories: state.getAllCategories() }
-  }));
-
-  renderManageCatGrid();
-  if (feedback) { feedback.textContent = ""; feedback.classList.remove("visible"); }
-  audio.playSuccess?.();
 }
 
 function handleManageCatFileUpload(fileInput) {

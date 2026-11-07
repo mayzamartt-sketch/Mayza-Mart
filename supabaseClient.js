@@ -711,12 +711,25 @@
           const parsed = JSON.parse(data[0].desc);
           if (parsed && typeof parsed === 'object') {
             if (Array.isArray(parsed.customCategories)) {
-              custom = parsed.customCategories;
-              localStorage.setItem('mm_custom_categories', JSON.stringify(custom));
+              // Sanitize any legacy huge data URLs to keep localStorage safe
+              custom = parsed.customCategories.map(c => {
+                if (c && c.image && c.image.length > 50000) {
+                  return { ...c, image: 'assets/cat-return-gifts.jpg' };
+                }
+                return c;
+              });
+              try {
+                localStorage.setItem('mm_custom_categories', JSON.stringify(custom));
+              } catch(e) {}
             }
             if (parsed.categoryOverrides && typeof parsed.categoryOverrides === 'object') {
               overrides = parsed.categoryOverrides;
-              localStorage.setItem('mm_category_overrides', JSON.stringify(overrides));
+              try {
+                localStorage.setItem('mm_category_overrides', JSON.stringify(overrides));
+                if (Array.isArray(overrides.__deleted_categories__)) {
+                  localStorage.setItem('mm_deleted_categories', JSON.stringify(overrides.__deleted_categories__));
+                }
+              } catch(e) {}
             }
             return { customCategories: custom, categoryOverrides: overrides };
           }
