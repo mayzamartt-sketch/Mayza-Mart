@@ -148,14 +148,37 @@ class StudioState {
   addCustomCategory(name, emoji = "✨", image = "", subtitle = "") {
     const trimmed = (name || "").trim();
     if (!trimmed) return null;
+
+    // 1. Un-delete from local storage if previously marked deleted
+    try {
+      let deletedCats = JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]');
+      const filtered = deletedCats.filter(c => String(c).toLowerCase().trim() !== trimmed.toLowerCase());
+      localStorage.setItem('mm_deleted_categories', JSON.stringify(filtered));
+    } catch(e) {}
     
     const existing = this.getAllCategories().find(c => c.name.toLowerCase() === trimmed.toLowerCase());
     if (existing) {
-      if (existing.isCustom && (image || subtitle)) {
+      if (existing.isCustom) {
         if (image) existing.image = image;
         if (subtitle) existing.subtitle = subtitle;
         if (emoji && emoji !== "✨") existing.emoji = emoji;
-        this.save();
+      } else {
+        const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+        overrides[existing.name] = {
+          image: image || existing.image,
+          subtitle: subtitle || existing.subtitle,
+          emoji: (emoji && emoji !== "✨") ? emoji : existing.emoji
+        };
+        localStorage.setItem('mm_category_overrides', JSON.stringify(overrides));
+      }
+      this.save();
+      if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
+        try {
+          const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+          const deletedCats = JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]');
+          overrides.__deleted_categories__ = deletedCats;
+          window.mayzaSupabase.saveStoreCategories(this.customCategories, overrides).catch(console.warn);
+        } catch(e) {}
       }
       return existing;
     }
@@ -178,6 +201,8 @@ class StudioState {
     if (window.mayzaSupabase && window.mayzaSupabase.saveStoreCategories) {
       try {
         const overrides = JSON.parse(localStorage.getItem('mm_category_overrides') || '{}');
+        const deletedCats = JSON.parse(localStorage.getItem('mm_deleted_categories') || '[]');
+        overrides.__deleted_categories__ = deletedCats;
         window.mayzaSupabase.saveStoreCategories(this.customCategories, overrides).catch(console.warn);
       } catch(e) {}
     }
@@ -231,7 +256,10 @@ class StudioState {
               deletedIds = await window.mayzaSupabase.fetchDeletedProductIds();
             } catch(e) {}
           }
-          this.products = data.products.filter(p => !deletedIds.has(String(p.id)));
+          const cleanCloud = data.products.filter(p => !deletedIds.has(String(p.id)));
+          const cloudIdSet = new Set(cleanCloud.map(p => String(p.id)));
+          const pendingLocal = (this.products || []).filter(p => !deletedIds.has(String(p.id)) && !cloudIdSet.has(String(p.id)));
+          this.products = [...cleanCloud, ...pendingLocal];
           changed = true;
         }
         if (Array.isArray(data.orders)) {
@@ -1261,6 +1289,66 @@ function hideInlineCategoryCreator(isWholesale = false) {
   if (previewImg) previewImg.src = "";
 }
 
+function compressImageFile(file, maxDim = 800, quality = 0.82, cb) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width;
+      let h = img.height;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+      cb(dataUrl);
+    };
+    img.onerror = () => {
+      cb(e.target.result);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleProductImageUpload(fileInput) {
+  const file = fileInput?.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    showToast("Please select a valid image file! 🖼️", "warning");
+    return;
+  }
+
+  showToast("Optimizing product photo... ⏳");
+  compressImageFile(file, 800, 0.82, (dataUrl) => {
+    const finalInput = document.getElementById("prodFinalImageUrl");
+    if (finalInput) finalInput.value = dataUrl;
+
+    const preview = document.getElementById("prodImagePreview");
+    if (preview) preview.src = dataUrl;
+
+    const status = document.getElementById("prodImagePreviewStatus");
+    if (status) status.textContent = `Photo Selected: ${file.name}`;
+
+    const note = document.getElementById("prodImagePreviewNote");
+    if (note) note.textContent = `Ready & optimized for store (${Math.round(dataUrl.length * 0.75 / 1024)} KB)`;
+
+    showToast("Product image chosen! 📷 Click Save Product to finish.");
+  });
+}
+
 function updateCategoryPreview(isWholesale = false, src = "") {
   const previewRow = document.getElementById(isWholesale ? "wsCategoryPreviewRow" : "inlineCategoryPreviewRow");
   const previewImg = document.getElementById(isWholesale ? "wsCategoryPreviewImg" : "inlineCategoryPreviewImg");
@@ -1286,17 +1374,15 @@ function handleCategoryFileUpload(isWholesale = false, fileInput) {
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const dataUrl = e.target.result;
+  showToast("Optimizing category image... ⏳");
+  compressImageFile(file, 800, 0.82, (dataUrl) => {
     const imageUrlInput = document.getElementById(isWholesale ? "wsInlineCategoryImageUrl" : "inlineCategoryImageUrl");
     if (imageUrlInput) {
       imageUrlInput.value = dataUrl;
     }
     updateCategoryPreview(isWholesale, dataUrl);
     showToast("Category image loaded! ✨");
-  };
-  reader.readAsDataURL(file);
+  });
 }
 
 function saveInlineCategory(isWholesale = false) {
@@ -1711,16 +1797,14 @@ function handleManageCatFileUpload(fileInput) {
     showToast("Please select a valid image file! 🖼️", "warning");
     return;
   }
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const dataUrl = e.target.result;
+  showToast("Optimizing category image... ⏳");
+  compressImageFile(file, 800, 0.82, (dataUrl) => {
     const imageUrlInput = document.getElementById("manageCatImageUrl");
     const previewImg = document.getElementById("manageCatPreviewImg");
     if (imageUrlInput) imageUrlInput.value = dataUrl;
     if (previewImg) previewImg.src = dataUrl;
     showToast("Image loaded! Click Save Changes to apply. ✨");
-  };
-  reader.readAsDataURL(file);
+  });
 }
 
 
@@ -1731,6 +1815,20 @@ function openAddProductModal() {
   renderCategorySelects();
   hideInlineCategoryCreator(false);
   document.getElementById("prodSku").value = `MM-${Date.now().toString().slice(-4)}`;
+
+  // Reset product image picker
+  const fileInput = document.getElementById("prodImageFileInput");
+  if (fileInput) fileInput.value = "";
+  const finalInput = document.getElementById("prodFinalImageUrl");
+  if (finalInput) finalInput.value = "assets/p-clips.jpg";
+  const preview = document.getElementById("prodImagePreview");
+  if (preview) preview.src = "assets/p-clips.jpg";
+  const status = document.getElementById("prodImagePreviewStatus");
+  if (status) status.textContent = "Default Image Selected";
+  const note = document.getElementById("prodImagePreviewNote");
+  if (note) note.textContent = 'Click "Choose Image" to upload any photo from your device';
+  document.getElementById("prodUrlPresetRow")?.classList.add("hidden");
+
   document.getElementById("productModal").classList.add("active");
   audio.playClick();
 }
@@ -1751,14 +1849,38 @@ function openEditProductModal(productId) {
   document.getElementById("prodComparePrice").value = prod.comparePrice || "";
   document.getElementById("prodStock").value = prod.stock;
   document.getElementById("prodTag").value = prod.tag || "None";
-  document.getElementById("prodImageSelect").value = prod.image.startsWith("assets/") ? prod.image : "custom";
   
+  // Set current image in picker & preview
+  const currentImg = prod.image || "assets/p-clips.jpg";
+  const finalInput = document.getElementById("prodFinalImageUrl");
+  if (finalInput) finalInput.value = currentImg;
+  const preview = document.getElementById("prodImagePreview");
+  if (preview) preview.src = currentImg;
+  const status = document.getElementById("prodImagePreviewStatus");
+  if (status) status.textContent = "Current Product Image";
+  const note = document.getElementById("prodImagePreviewNote");
+  if (note) note.textContent = currentImg.startsWith("data:") ? "Custom uploaded photo" : currentImg;
+
+  const fileInput = document.getElementById("prodImageFileInput");
+  if (fileInput) fileInput.value = "";
+
+  const select = document.getElementById("prodImageSelect");
+  if (select) {
+    if (currentImg.startsWith("assets/")) {
+      select.value = currentImg;
+    } else {
+      select.value = "custom";
+    }
+  }
   const customInput = document.getElementById("prodCustomImageUrl");
-  if (!prod.image.startsWith("assets/")) {
-    customInput.value = prod.image;
-    customInput.classList.remove("hidden");
-  } else {
-    customInput.classList.add("hidden");
+  if (customInput) {
+    if (!currentImg.startsWith("assets/")) {
+      customInput.value = currentImg;
+      customInput.classList.remove("hidden");
+    } else {
+      customInput.value = "";
+      customInput.classList.add("hidden");
+    }
   }
 
   document.getElementById("productModal").classList.add("active");
@@ -1770,7 +1892,7 @@ function closeProductModal() {
   document.getElementById("productModal").classList.remove("active");
 }
 
-function handleProductFormSubmit(e) {
+async function handleProductFormSubmit(e) {
   e.preventDefault();
   const editId = document.getElementById("editProductId").value;
   const title = document.getElementById("prodTitle").value.trim();
@@ -1785,10 +1907,7 @@ function handleProductFormSubmit(e) {
   const stock = parseInt(document.getElementById("prodStock").value) || 0;
   const tag = document.getElementById("prodTag").value;
 
-  let image = document.getElementById("prodImageSelect").value;
-  if (image === "custom") {
-    image = document.getElementById("prodCustomImageUrl").value.trim() || "assets/p-clips.jpg";
-  }
+  const image = document.getElementById("prodFinalImageUrl")?.value?.trim() || "assets/p-clips.jpg";
 
   let targetProduct = null;
   if (editId) {
@@ -1803,7 +1922,6 @@ function handleProductFormSubmit(e) {
       prod.tag = tag;
       prod.image = image;
       targetProduct = prod;
-      showToast(`Updated "${title}" successfully! ✨`);
     }
   } else {
     const newProd = {
@@ -1820,14 +1938,30 @@ function handleProductFormSubmit(e) {
     };
     state.products.unshift(newProd);
     targetProduct = newProd;
-    showToast(`Added "${title}" to Wonderland Studio! 🌸`);
-    triggerCelebration();
   }
 
   state.save();
+  renderProductMatrix();
+  renderDashboardOverview();
 
-  if (targetProduct && window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
-    window.mayzaSupabase.upsertProduct(targetProduct).catch(console.warn);
+  const saveBtn = document.getElementById("saveProductBtnText");
+  const saveBtnParent = saveBtn?.closest("button");
+  if (saveBtnParent) saveBtnParent.disabled = true;
+  if (saveBtn) saveBtn.textContent = "Saving to Cloud...";
+
+  try {
+    if (targetProduct && window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
+      await window.mayzaSupabase.upsertProduct(targetProduct);
+      console.log("[Admin] Product saved to Supabase cloud:", targetProduct.id);
+    }
+    showToast(editId ? `Updated "${title}" successfully with cloud sync! ✨` : `Added "${title}" with live cloud sync! 🌸`);
+    triggerCelebration();
+  } catch (err) {
+    console.warn("[Admin] Supabase upsert error:", err);
+    showToast(`Saved locally! Cloud upload pending: ${err.message}`, "warning");
+  } finally {
+    if (saveBtnParent) saveBtnParent.disabled = false;
+    if (saveBtn) saveBtn.textContent = "Save Product";
   }
 
   closeProductModal();
@@ -3545,14 +3679,66 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Product image select dropdown
+  // Product Image Picker (Choose Image button, remove button, URL toggle)
+  document.getElementById("prodChooseImageBtn")?.addEventListener("click", () => {
+    document.getElementById("prodImageFileInput")?.click();
+  });
+  document.getElementById("prodImageFileInput")?.addEventListener("change", function() {
+    handleProductImageUpload(this);
+  });
+  document.getElementById("prodToggleUrlBtn")?.addEventListener("click", () => {
+    const row = document.getElementById("prodUrlPresetRow");
+    if (row) row.classList.toggle("hidden");
+  });
   document.getElementById("prodImageSelect")?.addEventListener("change", (e) => {
     const customInput = document.getElementById("prodCustomImageUrl");
-    if (e.target.value === "custom") {
+    const val = e.target.value;
+    if (val === "custom") {
       customInput?.classList.remove("hidden");
+      customInput?.focus();
     } else {
       customInput?.classList.add("hidden");
+      const finalInput = document.getElementById("prodFinalImageUrl");
+      if (finalInput) finalInput.value = val;
+      const preview = document.getElementById("prodImagePreview");
+      if (preview) preview.src = val;
+      const status = document.getElementById("prodImagePreviewStatus");
+      if (status) status.textContent = `Preset: ${e.target.options[e.target.selectedIndex].text}`;
+      const note = document.getElementById("prodImagePreviewNote");
+      if (note) note.textContent = val;
     }
+  });
+  document.getElementById("prodCustomImageUrl")?.addEventListener("input", (e) => {
+    const url = e.target.value.trim();
+    if (url) {
+      const finalInput = document.getElementById("prodFinalImageUrl");
+      if (finalInput) finalInput.value = url;
+      const preview = document.getElementById("prodImagePreview");
+      if (preview) {
+        preview.src = url;
+        preview.onerror = function() { this.onerror = null; this.src = "assets/p-clips.jpg"; };
+      }
+      const status = document.getElementById("prodImagePreviewStatus");
+      if (status) status.textContent = "Custom Image URL";
+      const note = document.getElementById("prodImagePreviewNote");
+      if (note) note.textContent = url;
+    }
+  });
+  document.getElementById("prodImageRemoveBtn")?.addEventListener("click", () => {
+    const fileInput = document.getElementById("prodImageFileInput");
+    if (fileInput) fileInput.value = "";
+    const finalInput = document.getElementById("prodFinalImageUrl");
+    if (finalInput) finalInput.value = "assets/p-clips.jpg";
+    const preview = document.getElementById("prodImagePreview");
+    if (preview) preview.src = "assets/p-clips.jpg";
+    const status = document.getElementById("prodImagePreviewStatus");
+    if (status) status.textContent = "Default Image Selected";
+    const note = document.getElementById("prodImagePreviewNote");
+    if (note) note.textContent = 'Click "Choose Image" to upload any photo from your device';
+    const select = document.getElementById("prodImageSelect");
+    if (select) select.value = "assets/p-clips.jpg";
+    const customInput = document.getElementById("prodCustomImageUrl");
+    if (customInput) { customInput.value = ""; customInput.classList.add("hidden"); }
   });
 
   // Invoice Modal Print & Close

@@ -1243,20 +1243,53 @@
           </div>
 
           <div class="form-group full-col">
-            <label for="prodImageSelect">Product Image Asset</label>
-            <select id="prodImageSelect" class="studio-input">
-              <option value="assets/p-clips.jpg">Hair Clips (assets/p-clips.jpg)</option>
-              <option value="assets/p-giftbox.jpg">Unicorn Gift Box (assets/p-giftbox.jpg)</option>
-              <option value="assets/p-handbag.jpg">Handbag (assets/p-handbag.jpg)</option>
-              <option value="assets/p-bottle.jpg">Water Bottle (assets/p-bottle.jpg)</option>
-              <option value="assets/p-candle.jpg">Aroma Candle (assets/p-candle.jpg)</option>
-              <option value="assets/p-scrunchies.jpg">Silk Scrunchies (assets/p-scrunchies.jpg)</option>
-              <option value="assets/cat-stationery.jpg">Stationery Kit (assets/cat-stationery.jpg)</option>
-              <option value="assets/cat-toys.jpg">Plush Toy (assets/cat-toys.jpg)</option>
-              <option value="assets/cat-jewellery.jpg">Jewellery Set (assets/cat-jewellery.jpg)</option>
-              <option value="custom">-- Custom Image URL --</option>
-            </select>
-            <input type="text" id="prodCustomImageUrl" class="studio-input hidden mt-2" placeholder="Enter custom image URL...">
+            <label>Product Image *</label>
+            <div class="prod-image-picker-wrap">
+              <!-- Hidden file input for device photo selection -->
+              <input type="file" id="prodImageFileInput" accept="image/*" style="display: none;">
+              <!-- Hidden final image value holder used on form submit -->
+              <input type="hidden" id="prodFinalImageUrl" value="assets/p-clips.jpg">
+
+              <!-- Action Bar with Choose Image button & URL toggle -->
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <button type="button" class="action-btn primary-glow-btn" id="prodChooseImageBtn" style="padding: 8px 16px; font-size: 0.86rem;">
+                  <span class="btn-icon">📷</span>
+                  <span>Choose Image</span>
+                </button>
+                <button type="button" class="action-btn secondary-btn" id="prodToggleUrlBtn" style="padding: 8px 14px; font-size: 0.82rem;">
+                  <span>🔗 Or Use URL / Preset</span>
+                </button>
+              </div>
+
+              <!-- Collapsible Preset/URL row -->
+              <div id="prodUrlPresetRow" class="hidden" style="margin-top: 10px; display: flex; gap: 8px; flex-direction: column;">
+                <select id="prodImageSelect" class="studio-input">
+                  <option value="assets/p-clips.jpg">Preset: Hair Clips (assets/p-clips.jpg)</option>
+                  <option value="assets/p-giftbox.jpg">Preset: Unicorn Gift Box (assets/p-giftbox.jpg)</option>
+                  <option value="assets/p-handbag.jpg">Preset: Handbag (assets/p-handbag.jpg)</option>
+                  <option value="assets/p-bottle.jpg">Preset: Water Bottle (assets/p-bottle.jpg)</option>
+                  <option value="assets/p-candle.jpg">Preset: Aroma Candle (assets/p-candle.jpg)</option>
+                  <option value="assets/p-scrunchies.jpg">Preset: Silk Scrunchies (assets/p-scrunchies.jpg)</option>
+                  <option value="assets/cat-stationery.jpg">Preset: Stationery Kit (assets/cat-stationery.jpg)</option>
+                  <option value="assets/cat-toys.jpg">Preset: Plush Toy (assets/cat-toys.jpg)</option>
+                  <option value="assets/cat-jewellery.jpg">Preset: Jewellery Set (assets/cat-jewellery.jpg)</option>
+                  <option value="custom">-- Enter Custom Image URL --</option>
+                </select>
+                <input type="text" id="prodCustomImageUrl" class="studio-input hidden" placeholder="Paste image URL here (https://...)">
+              </div>
+
+              <!-- Image Preview Card -->
+              <div class="prod-image-preview-card" id="prodImagePreviewCard" style="margin-top: 12px; display: flex; align-items: center; gap: 14px; background: rgba(255, 255, 255, 0.7); border: 1.5px dashed #FFD1DA; border-radius: 12px; padding: 10px 14px;">
+                <img id="prodImagePreview" src="assets/p-clips.jpg" alt="Product preview" style="width: 64px; height: 64px; object-fit: cover; border-radius: 10px; border: 1px solid #FFD1DA; background: #FFF;">
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 2px;">
+                  <span id="prodImagePreviewStatus" style="font-size: 0.82rem; font-weight: 700; color: #4A1722;">Default Image Selected</span>
+                  <span id="prodImagePreviewNote" style="font-size: 0.74rem; color: #8F5E6B;">Click "Choose Image" to upload any photo from your device</span>
+                </div>
+                <button type="button" id="prodImageRemoveBtn" class="action-btn secondary-btn" style="padding: 4px 10px; font-size: 0.78rem;" title="Reset image">
+                  ✕ Reset
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
