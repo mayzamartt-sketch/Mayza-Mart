@@ -830,17 +830,34 @@ class MayzaEntranceApp {
       }
 
       grid.innerHTML = productsToRender.map(p => {
-        const tag = p.tag || 'Best Seller';
-        const isNew = tag.toLowerCase().includes('new');
-        const badgeClass = isNew ? 'prod-badge-pill badge-new' : 'prod-badge-pill';
+        const stockNum = (p.stock !== undefined && p.stock !== null && p.stock !== '') ? parseInt(p.stock, 10) : 999;
+        const isOutOfStock = stockNum <= 0;
+
+        let tag = p.tag || 'Best Seller';
+        let badgeClass = 'prod-badge-pill';
+        if (isOutOfStock) {
+          tag = 'Sold Out';
+          badgeClass = 'prod-badge-pill badge-sold-out';
+        } else if (tag.toLowerCase().includes('new')) {
+          badgeClass = 'prod-badge-pill badge-new';
+        }
+
         const comparePriceHtml = p.comparePrice ? `<span class="prod-compare-price" style="text-decoration:line-through; font-size:0.85em; opacity:0.55; margin-left:6px; font-weight:500;">₹${p.comparePrice}</span>` : '';
         const imgSrc = p.image || 'assets/p-clips.jpg';
         const rating = p.rating || '4.8';
 
+        const actionBtnHtml = isOutOfStock
+          ? `<button class="add-to-cart-action-btn btn-out-of-stock" disabled aria-label="Sold Out" data-name="${escapeHtml(p.title)}" data-stock="0">
+               <span>✕</span> Sold Out
+             </button>`
+          : `<button class="add-to-cart-action-btn" aria-label="Add to cart" data-name="${escapeHtml(p.title)}" data-price="${p.price}" data-id="${escapeHtml(p.id)}" data-stock="${stockNum}">
+               <span>🛒</span> Add to Cart
+             </button>`;
+
         return `
-          <article class="product-item-card" data-name="${escapeHtml(p.title)}" data-id="${escapeHtml(p.id)}" data-category="${escapeHtml(p.category || '')}">
+          <article class="product-item-card ${isOutOfStock ? 'is-out-of-stock' : ''}" data-name="${escapeHtml(p.title)}" data-id="${escapeHtml(p.id)}" data-category="${escapeHtml(p.category || '')}" data-stock="${stockNum}">
             <div class="prod-card-media">
-              <img src="${escapeHtml(imgSrc)}" alt="${escapeHtml(p.title)}" loading="lazy" onerror="this.onerror=null; this.src='assets/p-clips.jpg';">
+              <img src="${escapeHtml(imgSrc)}" alt="${escapeHtml(p.title)}" loading="lazy" onerror="this.onerror=null; this.src='assets/p-clips.jpg';" ${isOutOfStock ? 'style="filter: grayscale(40%) opacity(0.85);"' : ''}>
               <span class="${badgeClass}">${escapeHtml(tag)}</span>
               <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
             </div>
@@ -848,9 +865,7 @@ class MayzaEntranceApp {
               <h3 class="prod-name-title">${escapeHtml(p.title)}</h3>
               <p class="prod-price-text">₹${p.price} ${comparePriceHtml}</p>
               <p class="prod-rating-score">★ ${rating}</p>
-              <button class="add-to-cart-action-btn" aria-label="Add to cart" data-name="${escapeHtml(p.title)}" data-price="${p.price}" data-id="${escapeHtml(p.id)}">
-                <span>🛒</span> Add to Cart
-              </button>
+              ${actionBtnHtml}
             </div>
           </article>
         `;
@@ -1369,6 +1384,7 @@ class MayzaEntranceApp {
         seenTitles.add(normTitle);
         const rating = typeof p.rating === 'number' ? p.rating : (parseFloat(p.rating) || 4.7);
         const price = typeof p.price === 'number' ? p.price : (parseFloat(p.price) || 199);
+        const stock = (p.stock !== undefined && p.stock !== null && p.stock !== '') ? parseInt(p.stock, 10) : 999;
         products.push({
           id: p.id || `prod-${Math.random().toString(36).slice(2, 7)}`,
           title: title,
@@ -1377,7 +1393,8 @@ class MayzaEntranceApp {
           tag: p.tag || 'Featured',
           img: p.image || p.img || 'assets/p-clips.jpg',
           dataName: title,
-          dataPrice: price
+          dataPrice: price,
+          stock: isNaN(stock) ? 999 : stock
         });
       }
     });
@@ -1401,6 +1418,8 @@ class MayzaEntranceApp {
         const ratingMatch = (ratingEl?.textContent || '').match(/\d+(\.\d+)?/);
         const rating = ratingMatch ? parseFloat(ratingMatch[0]) : 4.8;
         const tag = card.querySelector('.prod-badge-pill')?.textContent.trim() || 'Best Seller';
+        const stockAttr = card.getAttribute('data-stock');
+        const stock = (stockAttr !== null && stockAttr !== undefined && stockAttr !== '') ? parseInt(stockAttr, 10) : 999;
 
         products.push({
           id: id,
@@ -1410,7 +1429,8 @@ class MayzaEntranceApp {
           tag: tag,
           img: img,
           dataName: title,
-          dataPrice: price
+          dataPrice: price,
+          stock: isNaN(stock) ? 999 : stock
         });
       }
     });
@@ -1461,14 +1481,39 @@ class MayzaEntranceApp {
     if (emptyEl) emptyEl.style.display = 'none';
 
     grid.innerHTML = list.map(p => {
-      const tag   = p.tag || 'Featured';
-      const isNew = tag.toLowerCase().includes('new');
-      const badgeClass = isNew ? 'prod-badge-pill badge-new' : 'prod-badge-pill';
+      const stockNum = (p.stock !== undefined && p.stock !== null && p.stock !== '') ? parseInt(p.stock, 10) : 999;
+      const isOutOfStock = stockNum <= 0;
+
+      let tag = p.tag || 'Featured';
+      let badgeClass = 'prod-badge-pill';
+      if (isOutOfStock) {
+        tag = 'Sold Out';
+        badgeClass = 'prod-badge-pill badge-sold-out';
+      } else if (tag.toLowerCase().includes('new')) {
+        badgeClass = 'prod-badge-pill badge-new';
+      }
+
+      const actionBtnHtml = isOutOfStock
+        ? `<button class="add-to-cart-action-btn cat-page-add-btn btn-out-of-stock"
+             disabled
+             aria-label="Sold Out"
+             data-name="${escapeHtml(p.dataName)}"
+             data-stock="0">
+             <span>✕</span> Sold Out
+           </button>`
+        : `<button class="add-to-cart-action-btn cat-page-add-btn"
+             aria-label="Add to cart"
+             data-name="${escapeHtml(p.dataName)}"
+             data-price="${p.dataPrice}"
+             data-id="${escapeHtml(p.id)}"
+             data-stock="${stockNum}">
+             <span>🛒</span> Add to Cart
+           </button>`;
 
       return `
-        <article class="product-item-card" data-name="${escapeHtml(p.title)}" data-id="${escapeHtml(p.id)}">
+        <article class="product-item-card ${isOutOfStock ? 'is-out-of-stock' : ''}" data-name="${escapeHtml(p.title)}" data-id="${escapeHtml(p.id)}" data-stock="${stockNum}">
           <div class="prod-card-media">
-            <img src="${escapeHtml(p.img)}" alt="${escapeHtml(p.title)}" loading="lazy" onerror="this.onerror=null; this.src='assets/p-clips.jpg';">
+            <img src="${escapeHtml(p.img)}" alt="${escapeHtml(p.title)}" loading="lazy" onerror="this.onerror=null; this.src='assets/p-clips.jpg';" ${isOutOfStock ? 'style="filter: grayscale(40%) opacity(0.85);"' : ''}>
             <span class="${badgeClass}">${escapeHtml(tag)}</span>
             <button class="favorite-heart-btn" aria-label="Add to wishlist">♥</button>
           </div>
@@ -1476,13 +1521,7 @@ class MayzaEntranceApp {
             <h3 class="prod-name-title">${escapeHtml(p.title)}</h3>
             <p class="prod-price-text">₹${p.price}</p>
             <p class="prod-rating-score">★ ${p.rating.toFixed(1)}</p>
-            <button class="add-to-cart-action-btn cat-page-add-btn"
-              aria-label="Add to cart"
-              data-name="${escapeHtml(p.dataName)}"
-              data-price="${p.dataPrice}"
-              data-id="${escapeHtml(p.id)}">
-              <span>🛒</span> Add to Cart
-            </button>
+            ${actionBtnHtml}
           </div>
         </article>
       `;
@@ -1493,6 +1532,7 @@ class MayzaEntranceApp {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (btn.disabled || btn.classList.contains('btn-out-of-stock')) return;
         const name  = btn.getAttribute('data-name') || 'Item';
         const price = parseFloat(btn.getAttribute('data-price')) || 0;
         const card  = btn.closest('.product-item-card');
@@ -1584,6 +1624,7 @@ class MayzaEntranceApp {
       newBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (newBtn.disabled || newBtn.classList.contains('btn-out-of-stock')) return;
         const card = newBtn.closest('.product-item-card');
         const name = newBtn.getAttribute('data-name') || (card ? card.getAttribute('data-name') : 'Item');
         const price = parseFloat(newBtn.getAttribute('data-price')) || null;
@@ -2148,6 +2189,7 @@ class MayzaEntranceApp {
       if (btn) {
         e.preventDefault();
         e.stopPropagation();
+        if (btn.disabled || btn.classList.contains('btn-out-of-stock')) return;
         const card = btn.closest('.product-item-card');
         const name = btn.getAttribute('data-name') || (card ? card.getAttribute('data-name') : 'Item');
         const price = parseFloat(btn.getAttribute('data-price')) || null;
@@ -2524,7 +2566,46 @@ class MayzaEntranceApp {
     }
   }
 
+  getProductStock(productName) {
+    if (!productName) return 999;
+    const norm = productName.toLowerCase().trim();
+
+    // Check localStorage mm_products first (live synchronized from Supabase)
+    try {
+      const stored = JSON.parse(localStorage.getItem('mm_products') || '[]');
+      const match = stored.find(p => (p.title || p.name || '').toLowerCase().trim() === norm);
+      if (match && match.stock !== undefined && match.stock !== null && match.stock !== '') {
+        const s = parseInt(match.stock, 10);
+        return isNaN(s) ? 999 : s;
+      }
+    } catch(e) {}
+
+    // Check rendered DOM cards
+    try {
+      const allCards = document.querySelectorAll('.product-item-card');
+      for (const card of allCards) {
+        const cName = (card.getAttribute('data-name') || '').toLowerCase().trim();
+        if (cName === norm) {
+          const sAttr = card.getAttribute('data-stock');
+          if (sAttr !== null && sAttr !== undefined && sAttr !== '') {
+            const s = parseInt(sAttr, 10);
+            return isNaN(s) ? 999 : s;
+          }
+        }
+      }
+    } catch(e) {}
+
+    return 999;
+  }
+
   addToCart(productName, customPrice = null, customImg = null, autoOpenModal = true) {
+    const availableStock = this.getProductStock(productName);
+    if (availableStock <= 0) {
+      this.showToast(`Sorry, "${productName}" is currently Sold Out! ✕`, 'warning');
+      try { this.sound?.playBubblePop(300); } catch(e) {}
+      return;
+    }
+
     let items = this.getCartItems();
     
     // Find product details if available in card or fallback
@@ -2554,6 +2635,10 @@ class MayzaEntranceApp {
 
     const existing = items.find(i => i.name.toLowerCase() === productName.toLowerCase());
     if (existing) {
+      if (existing.qty >= availableStock) {
+        this.showToast(`Cannot add more! Only ${availableStock} in stock for "${productName}".`, 'warning');
+        return;
+      }
       existing.qty += 1;
     } else {
       items.push({
@@ -2657,6 +2742,14 @@ class MayzaEntranceApp {
     let items = this.getCartItems();
     const item = items.find(i => i.id === itemId);
     if (!item) return;
+
+    if (delta > 0) {
+      const availableStock = this.getProductStock(item.name);
+      if (item.qty >= availableStock) {
+        this.showToast(`Cannot add more! Only ${availableStock} in stock for "${item.name}".`, 'warning');
+        return;
+      }
+    }
 
     item.qty += delta;
     if (item.qty <= 0) {
