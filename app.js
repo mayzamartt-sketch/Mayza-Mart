@@ -800,21 +800,6 @@ class MayzaEntranceApp {
     const grid = document.getElementById('bestsellersProductsGrid') || document.querySelector('.bestsellers-products-grid');
     if (!grid) return;
 
-    if (!this.defaultProductsHtml) {
-      this.defaultProductsHtml = grid.innerHTML;
-    }
-
-    const defaultCatalog = [
-      { id: 'def-1', title: 'Cute Hair Clips Set (Pack of 12)', category: 'Hair Accessories', price: 249, rating: '4.8', tag: 'Best Seller', image: 'assets/p-clips.jpg' },
-      { id: 'def-2', title: 'Unicorn Return Gift Box (Set of 5)', category: 'Return Gifts', price: 299, rating: '4.7', tag: 'Best Seller', image: 'assets/p-giftbox.jpg' },
-      { id: 'def-3', title: 'Mini Handbag (Kids & Teens)', category: 'Handbags & Purses', price: 349, rating: '4.6', tag: 'New', image: 'assets/p-handbag.jpg' },
-      { id: 'def-4', title: 'Scented Candle Gift Set', category: 'Home & Lifestyle', price: 499, rating: '4.8', tag: 'Best Seller', image: 'assets/p-candle.jpg' },
-      { id: 'def-5', title: 'Designer Scrunchies (Set of 5)', category: 'Hair Accessories', price: 199, rating: '4.7', tag: 'Best Seller', image: 'assets/p-scrunchies.jpg' },
-      { id: 'def-6', title: 'Cute Water Bottle (500ml)', category: 'Home & Lifestyle', price: 299, rating: '4.6', tag: 'New', image: 'assets/p-bottle.jpg' },
-      { id: 'def-7', title: 'Stationery Set (Unicorn Theme)', category: 'Stationery', price: 349, rating: '4.8', tag: 'Best Seller', image: 'assets/cat-stationery.jpg' },
-      { id: 'def-8', title: 'Teddy Bear (Small)', category: 'Toys', price: 399, rating: '4.9', tag: 'Best Seller', image: 'assets/cat-toys.jpg' }
-    ];
-
     const escapeHtml = (str) => {
       if (!str) return '';
       return String(str).replace(/[&<>"']/g, m => ({
@@ -824,7 +809,13 @@ class MayzaEntranceApp {
 
     const renderProducts = (productsToRender) => {
       if (!productsToRender || productsToRender.length === 0) {
-        grid.innerHTML = this.defaultProductsHtml;
+        grid.innerHTML = `
+          <div class="empty-products-placeholder" style="grid-column: 1 / -1; text-align:center; padding: 48px 20px; color: var(--text-muted); font-size: 0.95rem;">
+            <div style="font-size: 2.2rem; margin-bottom: 8px;">🌸</div>
+            <p style="margin: 0; font-weight: 600; color: var(--primary);">Handcrafted Products Coming Soon!</p>
+            <p style="margin: 4px 0 0; font-size: 0.85rem; opacity: 0.75;">Add products from the Admin Panel to display them here.</p>
+          </div>
+        `;
         this.bindProductCardEvents();
         return;
       }
@@ -882,7 +873,7 @@ class MayzaEntranceApp {
       } catch (e) {}
     }
 
-    // 2. Show cached local products while cloud loads (filtered by deletedIds)
+    // 2. Show cached local products while cloud loads (ONLY real products, NO mock demo items)
     let cachedList = null;
     try {
       const stored = localStorage.getItem('mm_products');
@@ -891,9 +882,7 @@ class MayzaEntranceApp {
 
     if (Array.isArray(cachedList) && cachedList.length > 0) {
       const cleanList = cachedList.filter(p => !deletedIds.has(String(p.id)));
-      const customTitles = new Set(cleanList.map(c => (c.title || '').toLowerCase().trim()));
-      const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()) && !deletedIds.has(String(d.id)));
-      renderProducts([...cleanList, ...remainingDefaults]);
+      renderProducts(cleanList);
     }
 
     // 3. Fetch live products from Supabase (authoritative source)
@@ -903,12 +892,7 @@ class MayzaEntranceApp {
         if (Array.isArray(cloudProducts)) {
           const cleanCloud = cloudProducts.filter(p => !deletedIds.has(String(p.id)));
           localStorage.setItem('mm_products', JSON.stringify(cleanCloud));
-          const customTitles = new Set(cleanCloud.map(c => (c.title || '').toLowerCase().trim()));
-          // Only show default products whose title was NEVER in cloud AND not deleted
-          const remainingDefaults = defaultCatalog.filter(d =>
-            !customTitles.has(d.title.toLowerCase().trim()) && !deletedIds.has(String(d.id))
-          );
-          renderProducts([...cleanCloud, ...remainingDefaults]);
+          renderProducts(cleanCloud);
           this.syncLiveCategories();
         }
       } catch (err) {
@@ -916,15 +900,13 @@ class MayzaEntranceApp {
       }
     }
 
-    // 3. Listen to real-time custom product updates and cross-tab storage
+    // 4. Listen to real-time custom product updates and cross-tab storage
     if (!this.hasProductListeners) {
       this.hasProductListeners = true;
       window.addEventListener('mayza:products-updated', (e) => {
         if (e.detail?.products && Array.isArray(e.detail.products)) {
           const cleanList = e.detail.products.filter(p => !deletedIds.has(String(p.id)));
-          const customTitles = new Set(cleanList.map(c => (c.title || '').toLowerCase().trim()));
-          const remainingDefaults = defaultCatalog.filter(d => !customTitles.has(d.title.toLowerCase().trim()) && !deletedIds.has(String(d.id)));
-          renderProducts([...cleanList, ...remainingDefaults]);
+          renderProducts(cleanList);
           this.syncLiveCategories();
         } else {
           this.syncLiveProducts();
@@ -1310,109 +1292,48 @@ class MayzaEntranceApp {
     const products = [];
     const seenTitles = new Set();
 
-    // Source A: localStorage 'mm_products'
+    // 1. Respect deleted products from cloud & local
+    let deletedIds = new Set();
+    try {
+      deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]').map(String));
+    } catch (e) {}
+
+    // 2. ONLY fetch from real stored products in localStorage ('mm_products')
     let storedProducts = [];
     try {
       const stored = localStorage.getItem('mm_products');
       if (stored) storedProducts = JSON.parse(stored);
     } catch (e) {}
 
-    // Deleted products filter (respect cloud & local deletions)
-    let deletedIds = new Set();
-    try {
-      deletedIds = new Set(JSON.parse(localStorage.getItem('mm_deleted_product_ids') || '[]').map(String));
-    } catch (e) {}
-
-    // Source B: default catalog
-    const defaultCatalog = [
-      { id: 'def-1', title: 'Cute Hair Clips Set (Pack of 12)', category: 'Hair Accessories', price: 249, rating: 4.8, tag: 'Best Seller', image: 'assets/p-clips.jpg' },
-      { id: 'def-2', title: 'Unicorn Return Gift Box (Set of 5)', category: 'Return Gifts', price: 299, rating: 4.7, tag: 'Best Seller', image: 'assets/p-giftbox.jpg' },
-      { id: 'def-3', title: 'Mini Handbag (Kids & Teens)', category: 'Handbags & Purses', price: 349, rating: 4.6, tag: 'New', image: 'assets/p-handbag.jpg' },
-      { id: 'def-4', title: 'Scented Candle Gift Set', category: 'Home & Lifestyle', price: 499, rating: 4.8, tag: 'Best Seller', image: 'assets/p-candle.jpg' },
-      { id: 'def-5', title: 'Designer Scrunchies (Set of 5)', category: 'Hair Accessories', price: 199, rating: 4.7, tag: 'Best Seller', image: 'assets/p-scrunchies.jpg' },
-      { id: 'def-6', title: 'Cute Water Bottle (500ml)', category: 'Home & Lifestyle', price: 299, rating: 4.6, tag: 'New', image: 'assets/p-bottle.jpg' },
-      { id: 'def-7', title: 'Stationery Set (Unicorn Theme)', category: 'Stationery', price: 349, rating: 4.8, tag: 'Best Seller', image: 'assets/cat-stationery.jpg' },
-      { id: 'def-8', title: 'Teddy Bear (Small)', category: 'Toys', price: 399, rating: 4.9, tag: 'Best Seller', image: 'assets/cat-toys.jpg' }
-    ];
-
     const cleanStored = (storedProducts || []).filter(p => !deletedIds.has(String(p.id)));
-    const cleanDefault = defaultCatalog.filter(d => !deletedIds.has(String(d.id)));
 
-    const allCatalog = cleanStored.length > 0
-      ? [...cleanStored, ...cleanDefault]
-      : cleanDefault;
-
-    // Helper: fuzzy matching
-    const isCatMatch = (prodCat, prodTitle) => {
+    // STRICT Category Matching:
+    // Only products whose category strictly matches activeCat (case-insensitive)
+    // No mock demo products, no fuzzy title matching, zero cross-category mixing
+    const isCatMatch = (prodCat) => {
+      if (!activeCat || activeCat === 'all' || activeCat === 'view all categories') return true;
       const c = (prodCat || '').toLowerCase().trim();
-      const t = (prodTitle || '').toLowerCase().trim();
-      if (!activeCat) return true;
-      if (c === activeCat) return true;
-      if (c && (activeCat.includes(c) || c.includes(activeCat))) return true;
-      if (t.includes(activeCat)) return true;
-
-      // Match significant keywords (e.g., 'phone', 'charm', 'clips', 'hair', 'handbag', etc.)
-      const keywords = activeCat.split(/[\s,&+/]+/).filter(w => w.length > 2);
-      for (const w of keywords) {
-        if (c.includes(w) || t.includes(w)) return true;
-      }
-      return false;
+      return c === activeCat;
     };
 
-    // 1. Process catalog items
-    allCatalog.forEach(p => {
+    cleanStored.forEach(p => {
       const title = p.title || p.name || 'Product';
       const normTitle = title.toLowerCase().trim();
       if (seenTitles.has(normTitle)) return;
 
-      if (isCatMatch(p.category, title)) {
+      if (isCatMatch(p.category)) {
         seenTitles.add(normTitle);
-        const rating = typeof p.rating === 'number' ? p.rating : (parseFloat(p.rating) || 4.7);
+        const rating = typeof p.rating === 'number' ? p.rating : (parseFloat(p.rating) || 4.8);
         const price = typeof p.price === 'number' ? p.price : (parseFloat(p.price) || 199);
         const stock = (p.stock !== undefined && p.stock !== null && p.stock !== '') ? parseInt(p.stock, 10) : 999;
         products.push({
           id: p.id || `prod-${Math.random().toString(36).slice(2, 7)}`,
           title: title,
+          category: p.category,
           price: price,
           rating: rating,
           tag: p.tag || 'Featured',
           img: p.image || p.img || 'assets/p-clips.jpg',
-          dataName: title,
-          dataPrice: price,
-          stock: isNaN(stock) ? 999 : stock
-        });
-      }
-    });
-
-    // 2. Also check rendered DOM cards
-    const allCards = document.querySelectorAll('#bestsellersProductsGrid .product-item-card');
-    allCards.forEach(card => {
-      const title = card.getAttribute('data-name') || card.querySelector('.prod-name-title')?.textContent || '';
-      const normTitle = title.toLowerCase().trim();
-      if (seenTitles.has(normTitle)) return;
-
-      const cardCat = card.getAttribute('data-category') || '';
-      if (isCatMatch(cardCat, title)) {
-        seenTitles.add(normTitle);
-        const id = card.getAttribute('data-id') || `card-${Math.random().toString(36).slice(2, 7)}`;
-        const img = card.querySelector('img')?.src || 'assets/p-clips.jpg';
-        const priceEl = card.querySelector('.prod-price-text');
-        const priceMatch = (priceEl?.textContent || '').match(/\d+/);
-        const price = priceMatch ? parseInt(priceMatch[0], 10) : 199;
-        const ratingEl = card.querySelector('.prod-rating-score');
-        const ratingMatch = (ratingEl?.textContent || '').match(/\d+(\.\d+)?/);
-        const rating = ratingMatch ? parseFloat(ratingMatch[0]) : 4.8;
-        const tag = card.querySelector('.prod-badge-pill')?.textContent.trim() || 'Best Seller';
-        const stockAttr = card.getAttribute('data-stock');
-        const stock = (stockAttr !== null && stockAttr !== undefined && stockAttr !== '') ? parseInt(stockAttr, 10) : 999;
-
-        products.push({
-          id: id,
-          title: title,
-          price: price,
-          rating: rating,
-          tag: tag,
-          img: img,
           dataName: title,
           dataPrice: price,
           stock: isNaN(stock) ? 999 : stock
