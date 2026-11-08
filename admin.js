@@ -1401,7 +1401,7 @@ function handleCategoryFileUpload(isWholesale = false, fileInput) {
   }
 
   showToast("Optimizing category image... ⏳");
-  compressImageFile(file, 800, 0.82, (dataUrl) => {
+  compressImageFile(file, 600, 0.80, (dataUrl) => {
     const imageUrlInput = document.getElementById(isWholesale ? "wsInlineCategoryImageUrl" : "inlineCategoryImageUrl");
     if (imageUrlInput) {
       imageUrlInput.value = dataUrl;
@@ -1781,7 +1781,7 @@ function handleManageCatFileUpload(fileInput) {
     return;
   }
   showToast("Optimizing category image... ⏳");
-  compressImageFile(file, 800, 0.82, (dataUrl) => {
+  compressImageFile(file, 600, 0.80, (dataUrl) => {
     const imageUrlInput = document.getElementById("manageCatImageUrl");
     const previewImg = document.getElementById("manageCatPreviewImg");
     if (imageUrlInput) imageUrlInput.value = dataUrl;

@@ -740,9 +740,9 @@
           const parsed = JSON.parse(cloudDesc);
           if (parsed && typeof parsed === 'object') {
             if (Array.isArray(parsed.customCategories)) {
-              // Sanitize huge data URLs to keep storage clean
+              // Preserve legitimate uploaded category images (up to 2MB)
               custom = parsed.customCategories.map(c => {
-                if (c && c.image && c.image.length > 50000) {
+                if (c && c.image && c.image.length > 2000000) {
                   return { ...c, image: 'assets/cat-return-gifts.jpg' };
                 }
                 return c;
