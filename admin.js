@@ -875,12 +875,12 @@ function renderOrdersTable() {
 }
 
 async function deleteOrder(orderId) {
-  const order = state.orders.find(o => o.id === orderId);
+  const order = state.orders.find(o => String(o.id) === String(orderId));
   if (!order) return;
 
-  if (confirm(`Are you sure you want to delete order "${order.id}" (${order.customer.name} - ₹${order.total})?`)) {
+  if (confirm(`Are you sure you want to delete order "${order.id}" (${order.customer?.name || 'Customer'} - ₹${order.total})?`)) {
     // 1. Immediately remove from local state & UI
-    state.orders = state.orders.filter(o => o.id !== orderId);
+    state.orders = state.orders.filter(o => String(o.id) !== String(orderId));
     state.save();
 
     // 2. Mark in localStorage deleted IDs
@@ -918,7 +918,10 @@ async function deleteOrder(orderId) {
 
 function openEditOrderModal(orderId) {
   const order = state.orders.find(o => String(o.id) === String(orderId));
-  if (!order) return;
+  if (!order) {
+    showToast("Order not found.", "warning");
+    return;
+  }
 
   const modal = document.getElementById("editOrderModal");
   if (!modal) return;
@@ -970,6 +973,66 @@ function closeEditOrderModal() {
   if (modal) modal.classList.remove("active");
 }
 
+function exportOrdersCSV() {
+  const orders = state.orders || [];
+  if (orders.length === 0) {
+    showToast("No orders available to export.", "warning");
+    return;
+  }
+
+  const headers = [
+    "Order ID",
+    "Date",
+    "Customer Name",
+    "Phone",
+    "Address",
+    "City",
+    "PIN",
+    "Items Summary",
+    "Payment Mode",
+    "Order Status",
+    "Tracking Details",
+    "Total Amount (INR)"
+  ];
+
+  const rows = orders.map(o => {
+    const cust = o.customer || {};
+    const itemsSummary = Array.isArray(o.items)
+      ? o.items.map(i => `${i.qty || 1}x ${i.name || 'Item'} (Rs.${i.price || 0})`).join("; ")
+      : "";
+    const clean = val => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
+    return [
+      clean(o.id),
+      clean(o.rawDate || o.timestamp || o.date || ""),
+      clean(cust.name || ""),
+      clean(cust.phone || ""),
+      clean(cust.address || ""),
+      clean(cust.city || ""),
+      clean(cust.pin || ""),
+      clean(itemsSummary),
+      clean(o.payment || "Prepaid"),
+      clean(o.status || "New"),
+      clean(o.tracking || ""),
+      Number(o.total || 0).toFixed(2)
+    ].join(",");
+  });
+
+  const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", `Mayza_Mart_Orders_${new Date().toISOString().split("T")[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+
+  try { audio?.playSuccess?.(); } catch (e) {}
+  showToast("Orders exported to CSV successfully! 📥");
+}
+
 function getNextStatus(current) {
   if (current === "New") return "Packed";
   if (current === "Packed") return "Dispatched";
@@ -978,7 +1041,7 @@ function getNextStatus(current) {
 }
 
 function advanceOrderStatus(orderId) {
-  const order = state.orders.find(o => o.id === orderId);
+  const order = state.orders.find(o => String(o.id) === String(orderId));
   if (!order) return;
 
   const next = getNextStatus(order.status);
@@ -1222,9 +1285,14 @@ function renderCategorySelects(selectedCategory = null) {
 
   if (prodSelect) {
     const currentVal = selectedCategory || prodSelect.value;
+    const exists = allCats.some(c => (c.name || "").toLowerCase() === (currentVal || "").toLowerCase());
+    const extraOption = (currentVal && !exists && currentVal !== "__create_new__")
+      ? `<option value="${currentVal}">${currentVal}</option>`
+      : "";
+
     prodSelect.innerHTML = allCats.map(c => `
       <option value="${c.name}">${c.emoji ? c.emoji + " " : ""}${c.name}</option>
-    `).join("") + `
+    `).join("") + extraOption + `
       <option value="__create_new__">＋ Add New Category...</option>
     `;
     if (currentVal && currentVal !== "__create_new__") {
@@ -1234,9 +1302,14 @@ function renderCategorySelects(selectedCategory = null) {
 
   if (wsSelect) {
     const currentWsVal = selectedCategory || wsSelect.value;
+    const existsWs = allCats.some(c => (c.name || "").toLowerCase() === (currentWsVal || "").toLowerCase());
+    const extraWsOption = (currentWsVal && !existsWs && currentWsVal !== "__create_new__")
+      ? `<option value="${currentWsVal}">${currentWsVal}</option>`
+      : "";
+
     wsSelect.innerHTML = allCats.map(c => `
       <option value="${c.name}">${c.emoji ? c.emoji + " " : ""}${c.name}</option>
-    `).join("") + `
+    `).join("") + extraWsOption + `
       <option value="__create_new__">＋ Add New Category...</option>
     `;
     if (currentWsVal && currentWsVal !== "__create_new__") {
@@ -1817,21 +1890,55 @@ function openAddProductModal() {
 }
 
 function openEditProductModal(productId) {
-  const prod = state.products.find(p => p.id === productId);
-  if (!prod) return;
+  const prod = state.products.find(p => String(p.id) === String(productId));
+  if (!prod) {
+    console.warn("[Admin] Product not found for editing:", productId);
+    showToast("Product not found.", "warning");
+    return;
+  }
 
   renderCategorySelects(prod.category);
   hideInlineCategoryCreator(false);
 
-  document.getElementById("productModalTitle").textContent = "Edit Wonderland Product";
-  document.getElementById("editProductId").value = prod.id;
-  document.getElementById("prodTitle").value = prod.title;
-  document.getElementById("prodCategory").value = prod.category;
-  document.getElementById("prodSku").value = prod.sku;
-  document.getElementById("prodPrice").value = prod.price;
-  document.getElementById("prodComparePrice").value = prod.comparePrice || "";
-  document.getElementById("prodStock").value = prod.stock;
-  document.getElementById("prodTag").value = prod.tag || "None";
+  const titleEl = document.getElementById("productModalTitle");
+  if (titleEl) titleEl.textContent = "Edit Wonderland Product";
+
+  const idEl = document.getElementById("editProductId");
+  if (idEl) idEl.value = prod.id;
+
+  const titleInput = document.getElementById("prodTitle");
+  if (titleInput) titleInput.value = prod.title || "";
+
+  const catInput = document.getElementById("prodCategory");
+  if (catInput) catInput.value = prod.category || "";
+
+  const skuInput = document.getElementById("prodSku");
+  if (skuInput) skuInput.value = prod.sku || "";
+
+  const priceInput = document.getElementById("prodPrice");
+  if (priceInput) priceInput.value = prod.price ?? 0;
+
+  const compareInput = document.getElementById("prodComparePrice");
+  if (compareInput) compareInput.value = prod.comparePrice || "";
+
+  const stockInput = document.getElementById("prodStock");
+  if (stockInput) stockInput.value = prod.stock ?? 0;
+
+  const tagSelect = document.getElementById("prodTag");
+  if (tagSelect) {
+    const validTags = Array.from(tagSelect.options).map(o => o.value);
+    if (validTags.includes(prod.tag)) {
+      tagSelect.value = prod.tag;
+    } else if (prod.tag) {
+      const opt = document.createElement("option");
+      opt.value = prod.tag;
+      opt.textContent = prod.tag;
+      tagSelect.appendChild(opt);
+      tagSelect.value = prod.tag;
+    } else {
+      tagSelect.value = "None";
+    }
+  }
   
   // Set current image in picker & preview
   const currentImg = prod.image || "assets/p-clips.jpg";
@@ -1842,14 +1949,14 @@ function openEditProductModal(productId) {
   const status = document.getElementById("prodImagePreviewStatus");
   if (status) status.textContent = "Current Product Image";
   const note = document.getElementById("prodImagePreviewNote");
-  if (note) note.textContent = currentImg.startsWith("data:") ? "Custom uploaded photo" : currentImg;
+  if (note) note.textContent = (typeof currentImg === "string" && currentImg.startsWith("data:")) ? "Custom uploaded photo" : currentImg;
 
   const fileInput = document.getElementById("prodImageFileInput");
   if (fileInput) fileInput.value = "";
 
   const select = document.getElementById("prodImageSelect");
   if (select) {
-    if (currentImg.startsWith("assets/")) {
+    if (typeof currentImg === "string" && currentImg.startsWith("assets/")) {
       select.value = currentImg;
     } else {
       select.value = "custom";
@@ -1857,7 +1964,7 @@ function openEditProductModal(productId) {
   }
   const customInput = document.getElementById("prodCustomImageUrl");
   if (customInput) {
-    if (!currentImg.startsWith("assets/")) {
+    if (typeof currentImg === "string" && !currentImg.startsWith("assets/")) {
       customInput.value = currentImg;
       customInput.classList.remove("hidden");
     } else {
@@ -1866,13 +1973,15 @@ function openEditProductModal(productId) {
     }
   }
 
-  document.getElementById("productModal").classList.add("active");
-  audio.playClick();
+  const modal = document.getElementById("productModal");
+  if (modal) modal.classList.add("active");
+  try { audio?.playClick?.(); } catch(e) {}
 }
 
 function closeProductModal() {
   hideInlineCategoryCreator(false);
-  document.getElementById("productModal").classList.remove("active");
+  const modal = document.getElementById("productModal");
+  if (modal) modal.classList.remove("active");
 }
 
 async function handleProductFormSubmit(e) {
@@ -1894,7 +2003,7 @@ async function handleProductFormSubmit(e) {
 
   let targetProduct = null;
   if (editId) {
-    const prod = state.products.find(p => p.id === editId);
+    const prod = state.products.find(p => String(p.id) === String(editId));
     if (prod) {
       prod.title = title;
       prod.category = category;
@@ -1905,6 +2014,21 @@ async function handleProductFormSubmit(e) {
       prod.tag = tag;
       prod.image = image;
       targetProduct = prod;
+    } else {
+      const fallbackProd = {
+        id: editId,
+        title,
+        category,
+        sku,
+        price,
+        comparePrice,
+        stock,
+        tag,
+        image,
+        salesCount: 0
+      };
+      state.products.unshift(fallbackProd);
+      targetProduct = fallbackProd;
     }
   } else {
     const newProd = {
@@ -1957,14 +2081,14 @@ async function handleProductFormSubmit(e) {
 // 10. PRINTABLE PACKING SLIP & INVOICE MODAL
 // =========================================================
 function openInvoiceModal(orderId) {
-  const order = state.orders.find(o => o.id === orderId);
+  const order = state.orders.find(o => String(o.id) === String(orderId));
   if (!order) return;
 
   document.getElementById("invOrderId").textContent = order.id;
   document.getElementById("invBarcode").textContent = `|||| ${order.id} ||||`;
-  document.getElementById("invCustName").textContent = order.customer.name;
-  document.getElementById("invCustPhone").textContent = order.customer.phone;
-  document.getElementById("invCustAddress").textContent = order.customer.address;
+  document.getElementById("invCustName").textContent = order.customer?.name || "Customer";
+  document.getElementById("invCustPhone").textContent = order.customer?.phone || "";
+  document.getElementById("invCustAddress").textContent = order.customer?.address || "";
   document.getElementById("invDate").textContent = order.rawDate || "17 Sep 2026";
   document.getElementById("invPaymentMode").textContent = order.payment;
   document.getElementById("invStatus").textContent = order.status;
@@ -2354,6 +2478,7 @@ function renderWholesalePurchases() {
               ? `<button class="row-btn synced-pill" title="Stock synced with Product Matrix" onclick="syncWholesaleToProducts('${p.id}')">✓ Synced</button>`
               : `<button class="row-btn sync-btn" title="Add or update stock in Product Matrix" onclick="syncWholesaleToProducts('${p.id}')">🔄 Sync</button>`
             }
+            <button class="row-btn edit-ws-btn" title="Edit purchase details" onclick="openEditWholesaleModal('${p.id}')">✏️ Edit</button>
             <button class="row-btn" title="View & Print Voucher" onclick="viewWholesaleBill('${p.id}')">📄 Voucher</button>
             <button class="row-btn row-del-btn" title="Delete purchase" onclick="deleteWholesalePurchase('${p.id}')">🗑️</button>
           </div>
@@ -2442,6 +2567,9 @@ function openAddWholesaleModal() {
   if (!modal || !form) return;
 
   form.reset();
+  const titleEl = document.getElementById("wholesaleModalTitle");
+  if (titleEl) titleEl.textContent = "Log Wholesale Purchase (Bulk Buy)";
+
   document.getElementById("editWholesaleId").value = "";
   document.getElementById("wsBillNumber").value = `INV-WS-${Math.floor(100 + Math.random() * 900)}`;
   document.getElementById("wsPurchaseDate").value = new Date().toISOString().split("T")[0];
@@ -2456,6 +2584,47 @@ function openAddWholesaleModal() {
   audio.playClick();
 }
 
+function openEditWholesaleModal(purchaseId) {
+  const p = state.wholesalePurchases.find(item => String(item.id) === String(purchaseId));
+  if (!p) {
+    showToast("Wholesale purchase not found.", "warning");
+    return;
+  }
+
+  const modal = document.getElementById("wholesaleModal");
+  const form = document.getElementById("wholesaleForm");
+  if (!modal || !form) return;
+
+  const titleEl = document.getElementById("wholesaleModalTitle");
+  if (titleEl) titleEl.textContent = "Edit Wholesale Purchase";
+
+  document.getElementById("editWholesaleId").value = p.id;
+  document.getElementById("wsSupplierName").value = p.supplier || "";
+  document.getElementById("wsSupplierLocation").value = p.location || "";
+  document.getElementById("wsBillNumber").value = p.billNumber || "";
+  document.getElementById("wsPurchaseDate").value = p.date || new Date().toISOString().split("T")[0];
+  document.getElementById("wsProductName").value = p.productName || "";
+  document.getElementById("wsQuantity").value = p.quantity || 1;
+  document.getElementById("wsUnitCost").value = p.unitCost || 0;
+  document.getElementById("wsSellingPrice").value = p.sellingPrice || 0;
+  document.getElementById("wsPaymentStatus").value = p.paymentStatus || "Paid";
+  document.getElementById("wsPaymentMode").value = p.paymentMode || "UPI / Bank Transfer";
+  document.getElementById("wsNotes").value = p.notes || "";
+  document.getElementById("wsSyncCheckbox").checked = false;
+
+  renderCategorySelects(p.category);
+  hideInlineCategoryCreator(true);
+  populateWholesaleProductSelect();
+  if (p.productId) {
+    const sel = document.getElementById("wsProductSelect");
+    if (sel) sel.value = p.productId;
+  }
+  calculateWholesaleLiveMargin();
+
+  modal.classList.add("active");
+  try { audio?.playClick?.(); } catch(e) {}
+}
+
 function closeAddWholesaleModal() {
   hideInlineCategoryCreator(true);
   const modal = document.getElementById("wholesaleModal");
@@ -2465,6 +2634,7 @@ function closeAddWholesaleModal() {
 function handleWholesaleFormSubmit(e) {
   e.preventDefault();
 
+  const editId = document.getElementById("editWholesaleId")?.value;
   const supplier = document.getElementById("wsSupplierName").value.trim();
   const location = document.getElementById("wsSupplierLocation").value.trim() || "India";
   const billNumber = document.getElementById("wsBillNumber").value.trim();
@@ -2490,30 +2660,56 @@ function handleWholesaleFormSubmit(e) {
     return;
   }
 
-  const newPurchase = {
-    id: `ws-${Date.now()}`,
-    billNumber,
-    date,
-    supplier,
-    location,
-    productId: selectedProdId || null,
-    productName,
-    category,
-    quantity,
-    unitCost,
-    sellingPrice,
-    totalCost: quantity * unitCost,
-    paymentStatus,
-    paymentMode,
-    notes,
-    synced: false
-  };
+  let targetPurchase = null;
+  if (editId) {
+    const existing = state.wholesalePurchases.find(p => String(p.id) === String(editId));
+    if (existing) {
+      existing.supplier = supplier;
+      existing.location = location;
+      existing.billNumber = billNumber;
+      existing.date = date;
+      existing.productId = selectedProdId || existing.productId;
+      existing.productName = productName;
+      existing.category = category;
+      existing.quantity = quantity;
+      existing.unitCost = unitCost;
+      existing.sellingPrice = sellingPrice;
+      existing.totalCost = quantity * unitCost;
+      existing.paymentStatus = paymentStatus;
+      existing.paymentMode = paymentMode;
+      existing.notes = notes;
+      targetPurchase = existing;
+    }
+  }
+
+  if (!targetPurchase) {
+    const newPurchase = {
+      id: `ws-${Date.now()}`,
+      billNumber,
+      date,
+      supplier,
+      location,
+      productId: selectedProdId || null,
+      productName,
+      category,
+      quantity,
+      unitCost,
+      sellingPrice,
+      totalCost: quantity * unitCost,
+      paymentStatus,
+      paymentMode,
+      notes,
+      synced: false
+    };
+    targetPurchase = newPurchase;
+    state.wholesalePurchases.unshift(targetPurchase);
+  }
 
   // Sync to product catalog if requested
   if (shouldSync) {
     let existingProd = null;
     if (selectedProdId) {
-      existingProd = state.products.find(p => p.id === selectedProdId);
+      existingProd = state.products.find(p => String(p.id) === String(selectedProdId));
     }
     if (!existingProd) {
       existingProd = state.products.find(p => p.title.toLowerCase().trim() === productName.toLowerCase().trim());
@@ -2522,7 +2718,7 @@ function handleWholesaleFormSubmit(e) {
     if (existingProd) {
       existingProd.stock += quantity;
       existingProd.price = sellingPrice;
-      newPurchase.productId = existingProd.id;
+      targetPurchase.productId = existingProd.id;
       showToast(`Updated existing store inventory for "${existingProd.title}" (+${quantity} units)! 📦`);
     } else {
       const newProd = {
@@ -2538,25 +2734,24 @@ function handleWholesaleFormSubmit(e) {
         salesCount: 0
       };
       state.products.unshift(newProd);
-      newPurchase.productId = newProd.id;
+      targetPurchase.productId = newProd.id;
       showToast(`Created new store product "${productName}" with ${quantity} units stock! 🌸`);
     }
-    newPurchase.synced = true;
+    targetPurchase.synced = true;
   }
 
-  state.wholesalePurchases.unshift(newPurchase);
   state.save();
 
   if (window.mayzaSupabase && window.mayzaSupabase.isConfigured()) {
-    window.mayzaSupabase.upsertWholesale(newPurchase).catch(console.warn);
-    if (shouldSync && newPurchase.productId) {
-      const pToSync = state.products.find(p => p.id === newPurchase.productId);
+    window.mayzaSupabase.upsertWholesale(targetPurchase).catch(console.warn);
+    if (shouldSync && targetPurchase.productId) {
+      const pToSync = state.products.find(p => String(p.id) === String(targetPurchase.productId));
       if (pToSync) window.mayzaSupabase.upsertProduct(pToSync).catch(console.warn);
     }
   }
 
   triggerCelebration();
-  showToast(`Wholesale purchase ${billNumber} logged successfully! (₹${(quantity * unitCost).toLocaleString("en-IN")})`);
+  showToast(editId ? `Wholesale purchase ${billNumber} updated! ✨` : `Wholesale purchase ${billNumber} logged successfully! (₹${(quantity * unitCost).toLocaleString("en-IN")})`);
 
   closeAddWholesaleModal();
   renderWholesalePurchases();
@@ -2800,16 +2995,18 @@ function exportWholesaleCSV() {
     ].join(",");
   });
 
-  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
-  const encodedUri = encodeURI(csvContent);
+  const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
+  link.setAttribute("href", url);
   link.setAttribute("download", `Mayza_Mart_Wholesale_Ledger_${new Date().toISOString().split("T")[0]}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 
-  audio.playSuccess();
+  try { audio?.playSuccess?.(); } catch(e) {}
   showToast("Wholesale procurement ledger exported to CSV! 📥");
 }
 
@@ -3733,6 +3930,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Edit Order Modal Listeners
   document.getElementById("closeEditOrderModalBtn")?.addEventListener("click", closeEditOrderModal);
   document.getElementById("cancelEditOrderBtn")?.addEventListener("click", closeEditOrderModal);
+  document.getElementById("exportOrdersCsvBtn")?.addEventListener("click", exportOrdersCSV);
   document.getElementById("editOrderModal")?.addEventListener("click", (e) => {
     if (e.target === document.getElementById("editOrderModal")) closeEditOrderModal();
   });
@@ -3740,7 +3938,10 @@ document.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     const orderId = document.getElementById("editOrderId")?.value;
     const order = state.orders.find(o => String(o.id) === String(orderId));
-    if (!order) return;
+    if (!order) {
+      showToast("Could not find order to save.", "warning");
+      return;
+    }
 
     order.status = document.getElementById("editOrderStatus")?.value || "New";
     order.customer = order.customer || {};
@@ -3768,6 +3969,47 @@ document.addEventListener("DOMContentLoaded", () => {
     closeEditOrderModal();
     showToast(`Order #${order.id} updated successfully! 💾`);
     try { audio?.playSuccess?.(); } catch (err) {}
+  });
+
+  // Delegated click handler for Orders table actions
+  document.getElementById("ordersTableBody")?.addEventListener("click", (e) => {
+    const editBtn = e.target.closest(".edit-order-btn");
+    if (editBtn) {
+      const row = editBtn.closest("tr");
+      const orderId = row?.dataset?.orderId || editBtn.getAttribute("onclick")?.match(/'([^']+)'/)?.[1];
+      if (orderId) {
+        e.preventDefault();
+        openEditOrderModal(orderId);
+      }
+    }
+  });
+
+  // Delegated click handler for Product Grid & Table actions
+  const handleProductEditDelegation = (e) => {
+    const editBtn = e.target.closest(".edit-btn, .row-btn");
+    if (editBtn && (editBtn.classList.contains("edit-btn") || editBtn.textContent.trim().toLowerCase() === "edit")) {
+      const card = editBtn.closest(".product-card") || editBtn.closest("tr");
+      const prodId = card?.dataset?.productId || editBtn.getAttribute("onclick")?.match(/'([^']+)'/)?.[1];
+      if (prodId) {
+        e.preventDefault();
+        openEditProductModal(prodId);
+      }
+    }
+  };
+  document.getElementById("productMatrixGrid")?.addEventListener("click", handleProductEditDelegation);
+  document.getElementById("productMatrixTableBody")?.addEventListener("click", handleProductEditDelegation);
+
+  // Delegated click handler for Wholesale Table actions
+  document.getElementById("wholesaleTableBody")?.addEventListener("click", (e) => {
+    const editBtn = e.target.closest(".edit-ws-btn");
+    if (editBtn) {
+      const row = editBtn.closest("tr");
+      const wsId = row?.dataset?.wsId || editBtn.getAttribute("onclick")?.match(/'([^']+)'/)?.[1];
+      if (wsId) {
+        e.preventDefault();
+        openEditWholesaleModal(wsId);
+      }
+    }
   });
 
   // Coupons
@@ -4202,3 +4444,27 @@ function initSupabaseManager() {
     }
   });
 }
+
+// Expose modal and action functions to window for inline onclick handlers & outside access
+window.openEditProductModal = openEditProductModal;
+window.closeProductModal = closeProductModal;
+window.openAddProductModal = openAddProductModal;
+window.openEditOrderModal = openEditOrderModal;
+window.closeEditOrderModal = closeEditOrderModal;
+window.openInvoiceModal = openInvoiceModal;
+window.advanceOrderStatus = advanceOrderStatus;
+window.deleteOrder = deleteOrder;
+window.deleteProduct = deleteProduct;
+window.adjustStock = adjustStock;
+window.exportOrdersCSV = exportOrdersCSV;
+window.openEditWholesaleModal = openEditWholesaleModal;
+window.closeAddWholesaleModal = closeAddWholesaleModal;
+window.openAddWholesaleModal = openAddWholesaleModal;
+window.exportWholesaleCSV = exportWholesaleCSV;
+window.openCatEditPanel = openCatEditPanel;
+window.openCatCreatePanel = openCatCreatePanel;
+window.openManageCategoriesModal = openManageCategoriesModal;
+window.closeManageCategoriesModal = closeManageCategoriesModal;
+window.deleteWholesalePurchase = deleteWholesalePurchase;
+window.viewWholesaleBill = viewWholesaleBill;
+window.syncWholesaleToProducts = syncWholesaleToProducts;

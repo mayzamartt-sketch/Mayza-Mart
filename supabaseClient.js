@@ -379,12 +379,12 @@
       try {
         const row = {
           id: order.id,
-          customer: order.customer,
-          items: order.items,
-          subtotal: order.subtotal,
+          customer: order.customer || {},
+          items: order.items || [],
+          subtotal: order.subtotal ?? order.total ?? 0,
           shipping: order.shipping || 0,
-          total: order.total,
-          payment: order.payment,
+          total: order.total ?? 0,
+          payment: order.payment || 'Cash on Delivery',
           status: order.status || 'New',
           raw_date: order.rawDate || new Date().toLocaleString('en-IN')
         };
